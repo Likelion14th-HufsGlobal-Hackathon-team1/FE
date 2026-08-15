@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { AiOutlineClose } from "react-icons/ai";
+import { TbSearch } from "react-icons/tb";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
@@ -16,6 +18,12 @@ const CARE_HISTORY = [
   { date: "2026.02.24", status: "매장 방문 필요", store: "MCM 강남점" },
   { date: "2025.08.31", status: "양호", store: "미방문" },
 ];
+
+// TODO: 백엔드 로그인 응답의 케어 알림 정보로 교체합니다.
+const CARE_REMINDER = {
+  shouldShow: true,
+  intervalMonths: 3,
+};
 
 const Page = styled.div`
   width: min(100%, 480px);
@@ -316,11 +324,111 @@ const CharmImage = styled.img`
   margin: 10px auto 0;
 `;
 
+const ModalLayer = styled.div`
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: none;
+`;
+
+const ReminderModal = styled.section`
+  position: relative;
+  width: min(322px, calc(100vw - 40px));
+  min-height: 348px;
+  border: 1px solid var(--color-walnut);
+  border-radius: 30px;
+  padding: 53px 25px 28px;
+  background: var(--color-cream);
+  box-shadow:
+    -4px -4px 25px rgba(0, 0, 0, 0.15),
+    4px 4px 25px rgba(0, 0, 0, 0.1);
+  color: #090a0a;
+  text-align: center;
+  pointer-events: auto;
+
+  @media (max-width: 360px) {
+    min-height: 330px;
+    padding-inline: 20px;
+  }
+`;
+
+const CloseButton = styled.button`
+  position: absolute;
+  top: 19px;
+  right: 23px;
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #090a0a;
+  cursor: pointer;
+
+  svg {
+    width: 25px;
+    height: 25px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-walnut);
+    outline-offset: 3px;
+  }
+`;
+
+const ReminderTitle = styled.h2`
+  margin: 0;
+  color: #090a0a;
+  font: 400 23px/1.2 var(--font-english);
+`;
+
+const ReminderMessage = styled.p`
+  margin: 38px 0 0;
+  font: 300 clamp(14px, 4vw, 16px) / 1.55 var(--font-kopub);
+  word-break: keep-all;
+`;
+
+const CareBookingButton = styled.button`
+  display: flex;
+  width: 100%;
+  height: 39px;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 54px;
+  border: 0;
+  border-radius: 30px;
+  padding: 0 18px;
+  background: var(--color-walnut);
+  color: #fff;
+  font: 300 clamp(15px, 4.5vw, 18px) / 1 var(--font-kopub);
+  white-space: nowrap;
+  cursor: pointer;
+
+  svg {
+    width: 25px;
+    height: 25px;
+    flex: 0 0 auto;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-walnut);
+    outline-offset: 3px;
+  }
+`;
+
 const Home = () => {
   const navigate = useNavigate();
   const [flippedCards, setFlippedCards] = useState(() => new Set());
   const [careAlert, setCareAlert] = useState(true);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [showCareReminder, setShowCareReminder] = useState(
+    CARE_REMINDER.shouldShow,
+  );
   const cardViewport = useRef(null);
   const dragState = useRef(null);
   const suppressCardClick = useRef(false);
@@ -497,6 +605,42 @@ const Home = () => {
           <CharmImage src={charmBag} alt="참 장식이 달린 MCM 가방" />
         </CharmSection>
       </MainContent>
+
+      {showCareReminder && (
+        <ModalLayer>
+          <ReminderModal
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="care-reminder-title"
+            aria-describedby="care-reminder-description"
+          >
+            <CloseButton
+              type="button"
+              aria-label="케어 알림 닫기"
+              onClick={() => setShowCareReminder(false)}
+            >
+              <AiOutlineClose aria-hidden="true" />
+            </CloseButton>
+
+            <ReminderTitle id="care-reminder-title">Care Reminder</ReminderTitle>
+            <ReminderMessage id="care-reminder-description">
+              마지막 케어 이후 {CARE_REMINDER.intervalMonths}개월이 지났어요.
+              <br />
+              오래도록 좋은 상태를 유지할 수 있도록
+              <br />
+              지금 컨디션을 확인해보세요.
+            </ReminderMessage>
+
+            <CareBookingButton
+              type="button"
+              onClick={() => navigate("/care/upload")}
+            >
+              <TbSearch aria-hidden="true" />
+              MCM 케어 상담 예약
+            </CareBookingButton>
+          </ReminderModal>
+        </ModalLayer>
+      )}
     </Page>
   );
 };
