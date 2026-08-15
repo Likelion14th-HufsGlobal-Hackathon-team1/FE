@@ -44,6 +44,7 @@ function AppLayout() {
           <Route path="/care/upload" element={<CareUpload />} />
           <Route path="/care/result" element={<CareResult />} />
 
+          <Route path="/journey" element={<JourneyCharm />} />
           <Route path="/journey/trip" element={<JourneyTrip />} />
           <Route path="/journey/make" element={<JourneyMake />} />
           <Route path="/journey/design" element={<JourneyDesign />} />

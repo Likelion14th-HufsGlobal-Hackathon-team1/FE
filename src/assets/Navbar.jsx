@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   },
   {
     label: "Journey",
-    to: "/journey/trip",
+    to: "/journey/charm",
     icon: journeyIcon,
     matches: (path) => path.startsWith("/journey"),
   },
