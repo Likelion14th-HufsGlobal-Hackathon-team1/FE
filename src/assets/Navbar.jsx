@@ -31,35 +31,39 @@ const NAV_ITEMS = [
 const Nav = styled.nav`
   position: fixed;
   z-index: 1000;
-  right: 50%;
+  left: 50%;
   bottom: 0;
-  width: min(420px, 100vw);
-  height: calc(85px + env(safe-area-inset-bottom));
-  transform: translateX(50%);
-  border-radius: 35px 35px 0 0;
+  width: min(100% - 32px, 640px);
+  min-height: calc(85px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  transform: translateX(-50%);
+  border-radius: clamp(24px, 5vw, 35px) clamp(24px, 5vw, 35px) 0 0;
   background: var(--color-ivory-paper);
   box-shadow:
     0 -28px 9px rgba(0, 0, 0, 0.02),
     0 -13px 7px rgba(0, 0, 0, 0.03),
     0 -3px 4px rgba(0, 0, 0, 0.03);
+
+  @media (max-width: 480px) {
+    width: 100%;
+  }
 `;
 
 const MenuList = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 55px);
-  justify-content: center;
-  gap: 35px;
+  grid-template-columns: repeat(4, minmax(55px, 1fr));
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
   padding-top: 11px;
-
-  @media (max-width: 390px) {
-    gap: calc((100vw - 240px) / 3);
-  }
 `;
 
 const MenuLink = styled(Link)`
   display: flex;
-  width: 55px;
+  width: 100%;
+  max-width: 96px;
   height: 63px;
+  margin: 0 auto;
   box-sizing: border-box;
   flex-direction: column;
   align-items: center;
@@ -89,8 +93,8 @@ const MenuLink = styled(Link)`
 
 const MenuIcon = styled.img`
   display: block;
-  width: 30px;
-  height: 30px;
+  width: clamp(26px, 7vw, 30px);
+  height: clamp(26px, 7vw, 30px);
 `;
 
 const Navbar = () => {
