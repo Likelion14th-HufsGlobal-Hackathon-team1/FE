@@ -6,6 +6,7 @@ const GlobalStyles = createGlobalStyle`
     --color-walnut: #5c4033;
     --color-soft-taupe: #b6a892;
     --color-ivory-paper: #f3ecdf;
+    --color-cream: #F8F2EA;
 
     /* Figma font families */
     --font-english: "Fraunces 72pt", "Fraunces", serif;
