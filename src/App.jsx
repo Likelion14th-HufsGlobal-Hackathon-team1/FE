@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import styled from "styled-components";
 
 import Navbar from "./assets/Navbar";
@@ -21,14 +21,19 @@ import JourneyDetail from "./pages/JourneyDetail";
 const AppContent = styled.main`
   min-height: 100svh;
   box-sizing: border-box;
-  padding-bottom: calc(105px + env(safe-area-inset-bottom));
+  padding-bottom: ${(props) =>
+    props.$hideNav ? "0" : "calc(105px + env(safe-area-inset-bottom))"};
 `;
 
-function App() {
+const HIDE_NAV_PATHS = ["/login", "/signup"];
+
+function AppLayout() {
+  const { pathname } = useLocation();
+  const hideNav = HIDE_NAV_PATHS.includes(pathname.toLowerCase());
+
   return (
-    <BrowserRouter>
-      <GlobalStyles />
-      <AppContent>
+    <>
+      <AppContent $hideNav={hideNav}>
         <Routes>
           <Route path="/" element={<Home />} />
 
@@ -46,7 +51,16 @@ function App() {
           <Route path="/journey/detail" element={<JourneyDetail />} />
         </Routes>
       </AppContent>
-      <Navbar />
+      {!hideNav && <Navbar />}
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <GlobalStyles />
+      <AppLayout />
     </BrowserRouter>
   );
 }
