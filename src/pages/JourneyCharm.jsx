@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import charmBag from "../assets/charm-bag.svg";
+import PrimaryButton from "../components/Button";
 
 const Page = styled.main`
   display: flex;
@@ -112,36 +113,8 @@ const BagImage = styled.img`
   object-fit: contain;
 `;
 
-const VerifyButton = styled.button`
-  display: flex;
-  width: 100%;
-  min-height: 51px;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+const VerifyButton = styled(PrimaryButton)`
   margin-top: auto;
-  border: 0;
-  border-radius: 30px;
-  padding: 11px 20px;
-  background: var(--color-walnut);
-  color: #fff;
-  font: 300 18px/1 var(--font-kopub);
-  cursor: pointer;
-
-  svg {
-    width: 25px;
-    height: 25px;
-    flex: 0 0 auto;
-  }
-
-  &:hover {
-    filter: brightness(1.08);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-walnut);
-    outline-offset: 3px;
-  }
 `;
 
 const JourneyCharm = () => {
@@ -175,8 +148,10 @@ const JourneyCharm = () => {
 
       <BagImage src={charmBag} alt="참 장식이 달린 MCM 가방" />
 
-      <VerifyButton type="button" onClick={() => navigate("/journey/trip")}>
-        <TbPlus aria-hidden="true" />
+      <VerifyButton
+        icon={<TbPlus />}
+        onClick={() => navigate("/journey/trip")}
+      >
         여정 인증하기
       </VerifyButton>
     </Page>
