@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Mypage from "./pages/Mypage";
+import CollectionAll from "./pages/CollectionAll";
 
 import CareUpload from "./pages/CareUpload";
 import CareResult from "./pages/CareResult";
@@ -17,6 +18,7 @@ import JourneyMake from "./pages/JourneyMake";
 import JourneyDesign from "./pages/JourneyDesign";
 import JourneyCharm from "./pages/JourneyCharm";
 import JourneyDetail from "./pages/JourneyDetail";
+import CapsuleLetter from "./pages/CapsuleLetter";
 
 const AppContent = styled.main`
   min-height: 100svh;
@@ -40,6 +42,7 @@ function AppLayout() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/mypage" element={<Mypage />} />
+          <Route path="/mypage/collection" element={<CollectionAll />} />
 
           <Route path="/care/upload" element={<CareUpload />} />
           <Route path="/care/result" element={<CareResult />} />
@@ -50,6 +53,7 @@ function AppLayout() {
           <Route path="/journey/design" element={<JourneyDesign />} />
           <Route path="/journey/charm" element={<JourneyCharm />} />
           <Route path="/journey/detail" element={<JourneyDetail />} />
+          <Route path="/capsule-letter" element={<CapsuleLetter />} />
         </Routes>
       </AppContent>
       {!hideNav && <Navbar />}
