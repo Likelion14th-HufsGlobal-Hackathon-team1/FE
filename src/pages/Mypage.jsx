@@ -7,6 +7,7 @@ import bag2 from "../assets/bag2.png";
 import profileImg from "../assets/profile.png";
 import userImg from "../assets/user.png";
 import lockImg from "../assets/lock.png";
+import DUMMY_COLLECTION from "../data/collection";
 
 /* ───────────────────── 더미 데이터 ───────────────────── */
 const DUMMY_USER = {
@@ -15,21 +16,6 @@ const DUMMY_USER = {
   userId: "journey0811",
   password: "●●●●●●",
 };
-
-const DUMMY_COLLECTION = [
-  {
-    id: 1,
-    image: bag1,
-    name: "Mcm Small Drawstring Backpack",
-    openDate: "2036.8.12",
-  },
-  {
-    id: 2,
-    image: bag2,
-    name: "Mcm Small Drawstring Backpack",
-    openDate: "2035.7.12",
-  },
-];
 
 /* ───────────────────── 애니메이션 ───────────────────── */
 const fadeIn = keyframes`
