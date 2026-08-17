@@ -19,6 +19,7 @@ import JourneyDesign from "./pages/JourneyDesign";
 import JourneyCharm from "./pages/JourneyCharm";
 import JourneyDetail from "./pages/JourneyDetail";
 import CapsuleLetter from "./pages/CapsuleLetter";
+import ProductRegistration from "./pages/ProductRegistration";
 
 const AppContent = styled.main`
   min-height: 100svh;
@@ -54,6 +55,7 @@ function AppLayout() {
           <Route path="/journey/charm" element={<JourneyCharm />} />
           <Route path="/journey/detail" element={<JourneyDetail />} />
           <Route path="/capsule-letter" element={<CapsuleLetter />} />
+          <Route path="/product-registration" element={<ProductRegistration />} />
         </Routes>
       </AppContent>
       {!hideNav && <Navbar />}

@@ -595,7 +595,7 @@ const Mypage = () => {
       </ProfileCard>
 
       {/* 새 제품 등록 배너 */}
-      <RegisterBanner type="button" onClick={() => navigate("/care/upload")}>
+      <RegisterBanner type="button" onClick={() => navigate("/product-registration")}>
         <BannerTextGroup>
           <BannerTitle>새로운 제품 등록하기</BannerTitle>
           <BannerSub>
