@@ -1,9 +1,20 @@
 import { TbBookmark, TbPencil, TbPlus } from "react-icons/tb";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
-import charmBag from "../assets/charm-bag.svg";
+import bagImage from "../assets/bag1.png";
 import PrimaryButton from "../components/Button";
+
+const CREATED_CHARMS_STORAGE_KEY = "onepick-created-charms";
+
+const CHARM_POSITIONS = [
+  { top: "38%", left: "34%", rotate: "-8deg" },
+  { top: "40%", left: "50%", rotate: "5deg" },
+  { top: "37%", left: "66%", rotate: "-3deg" },
+  { top: "54%", left: "41%", rotate: "7deg" },
+  { top: "53%", left: "59%", rotate: "-6deg" },
+  { top: "58%", left: "74%", rotate: "8deg" },
+];
 
 const Page = styled.main`
   display: flex;
@@ -104,13 +115,31 @@ const DecorateButton = styled.button`
   }
 `;
 
-const BagImage = styled.img`
-  display: block;
+const BagStage = styled.div`
+  position: relative;
   width: min(282px, 82vw);
-  height: auto;
+  aspect-ratio: 198 / 144;
   align-self: center;
   margin-top: 31px;
+`;
+
+const BagImage = styled.img`
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+`;
+
+const AddedCharm = styled.img`
+  position: absolute;
+  z-index: 1;
+  top: ${({ $position }) => $position.top};
+  left: ${({ $position }) => $position.left};
+  width: clamp(35px, 16%, 50px);
+  height: 27%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.14));
+  transform: translate(-50%, -50%) rotate(${({ $position }) => $position.rotate});
 `;
 
 const VerifyButton = styled(PrimaryButton)`
@@ -119,6 +148,19 @@ const VerifyButton = styled(PrimaryButton)`
 
 const JourneyCharm = () => {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  let createdCharms = state?.createdCharms;
+
+  if (!Array.isArray(createdCharms)) {
+    try {
+      const savedCharms = JSON.parse(
+        localStorage.getItem(CREATED_CHARMS_STORAGE_KEY) ?? "[]",
+      );
+      createdCharms = Array.isArray(savedCharms) ? savedCharms : [];
+    } catch {
+      createdCharms = [];
+    }
+  }
 
   return (
     <Page>
@@ -146,7 +188,21 @@ const JourneyCharm = () => {
         꾸미기
       </DecorateButton>
 
-      <BagImage src={charmBag} alt="참 장식이 달린 MCM 가방" />
+      <BagStage>
+        <BagImage src={bagImage} alt="MCM 가방" />
+        {createdCharms.map((charm, index) => {
+          if (!charm?.imageUrl) return null;
+          const position = CHARM_POSITIONS[index % CHARM_POSITIONS.length];
+          return (
+            <AddedCharm
+              key={charm.instanceId ?? `${charm.id}-${index}`}
+              src={charm.imageUrl}
+              alt={`생성한 Charm ${index + 1}`}
+              $position={position}
+            />
+          );
+        })}
+      </BagStage>
 
       <VerifyButton
         icon={<TbPlus />}
