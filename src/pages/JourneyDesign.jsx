@@ -1,3 +1,413 @@
-const JourneyDesign = () => <div />;
+import { useRef, useState } from "react";
+import {
+  TbArrowLeft,
+  TbArrowsDiagonal2,
+  TbPencil,
+  TbRotate2,
+} from "react-icons/tb";
+import { useNavigate } from "react-router-dom";
+import styled from "styled-components";
+
+import bagImage from "../assets/bag1.png";
+import PrimaryButton from "../components/Button";
+
+const CREATED_CHARMS_STORAGE_KEY = "onepick-created-charms";
+const CHARM_LAYOUT_STORAGE_KEY = "onepick-charm-layout";
+
+const readCreatedCharms = () => {
+  try {
+    const charms = JSON.parse(
+      localStorage.getItem(CREATED_CHARMS_STORAGE_KEY) ?? "[]",
+    );
+    return Array.isArray(charms) ? charms.filter((charm) => charm?.imageUrl) : [];
+  } catch {
+    return [];
+  }
+};
+
+const createInitialLayout = (charms) => {
+  let savedLayout = {};
+  try {
+    savedLayout = JSON.parse(
+      localStorage.getItem(CHARM_LAYOUT_STORAGE_KEY) ?? "{}",
+    );
+  } catch {
+    savedLayout = {};
+  }
+
+  return charms.reduce((layout, charm, index) => {
+    const key = charm.instanceId ?? `${charm.id}-${index}`;
+    layout[key] = savedLayout[key] ?? {
+      x: 28 + (index % 4) * 15,
+      y: 43 + (index % 2) * 19,
+      rotation: index % 2 === 0 ? -6 : 6,
+      size: 54,
+    };
+    return layout;
+  }, {});
+};
+
+const Page = styled.main`
+  display: flex;
+  width: min(100%, 480px);
+  min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
+  margin: 0 auto;
+  padding: 18px clamp(20px, 7.7vw, 37px) 82px;
+  flex-direction: column;
+  color: #090a0a;
+  background: var(--color-ivory-paper);
+  text-align: left;
+`;
+
+const BackButton = styled.button`
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #090a0a;
+  cursor: pointer;
+
+  svg {
+    width: 29px;
+    height: 29px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-walnut);
+    outline-offset: 3px;
+  }
+`;
+
+const Intro = styled.section`
+  margin-top: 18px;
+`;
+
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 15px;
+`;
+
+const PencilIcon = styled(TbPencil)`
+  width: 24px;
+  height: 24px;
+`;
+
+const Title = styled.h1`
+  margin: 0;
+  font: 300 20px/1 var(--font-kopub);
+`;
+
+const DescriptionRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+`;
+
+const AccentLine = styled.span`
+  width: 1px;
+  height: 34px;
+  flex: 0 0 auto;
+  background: var(--color-soft-taupe);
+`;
+
+const Description = styled.p`
+  margin: 0;
+  font: 300 12px/1.35 var(--font-kopub);
+`;
+
+const BagStage = styled.div`
+  position: relative;
+  width: min(330px, 88vw);
+  aspect-ratio: 198 / 144;
+  align-self: center;
+  margin-top: clamp(42px, 10vh, 78px);
+  touch-action: none;
+  user-select: none;
+`;
+
+const BagImage = styled.img`
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+`;
+
+const PlacedCharm = styled.button`
+  position: absolute;
+  z-index: ${({ $selected }) => ($selected ? 3 : 2)};
+  top: ${({ $y }) => $y}%;
+  left: ${({ $x }) => $x}%;
+  display: grid;
+  width: ${({ $size }) => $size}px;
+  height: ${({ $size }) => $size}px;
+  box-sizing: border-box;
+  place-items: center;
+  border: ${({ $selected }) => ($selected ? "1px dashed var(--color-walnut)" : "0")};
+  border-radius: 50%;
+  padding: 3px;
+  background: transparent;
+  cursor: grab;
+  transform: translate(-50%, -50%) rotate(${({ $rotation }) => $rotation}deg);
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  img {
+    position: absolute;
+    inset: 4px;
+    display: block;
+    width: calc(100% - 8px);
+    height: calc(100% - 8px);
+    object-fit: contain;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.16));
+  }
+`;
+
+const EmptyMessage = styled.p`
+  margin: 58px 0 20px;
+  color: var(--color-soft-taupe);
+  font: 300 14px/1.5 var(--font-kopub);
+  text-align: center;
+`;
+
+const CharmShelf = styled.div`
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  overflow-x: auto;
+  padding: 5px 2px 8px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+`;
+
+const CharmThumbnail = styled.button`
+  position: relative;
+  display: grid;
+  width: 62px;
+  height: 62px;
+  box-sizing: border-box;
+  flex: 0 0 62px;
+  place-items: center;
+  border: 1px solid
+    ${({ $selected }) => ($selected ? "var(--color-walnut)" : "transparent")};
+  border-radius: 14px;
+  padding: 5px;
+  overflow: hidden;
+  background: ${({ $selected }) =>
+    $selected ? "rgba(182, 168, 146, 0.25)" : "transparent"};
+  cursor: pointer;
+
+  img {
+    position: absolute;
+    inset: 5px;
+    display: block;
+    width: calc(100% - 10px);
+    height: calc(100% - 10px);
+    object-fit: contain;
+  }
+`;
+
+const Controls = styled.div`
+  display: grid;
+  min-height: 74px;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 3px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(182, 168, 146, 0.18);
+  visibility: ${({ $visible }) => ($visible ? "visible" : "hidden")};
+`;
+
+const Control = styled.label`
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 7px;
+  color: #090a0a;
+  font: 300 12px/1 var(--font-kopub);
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  input {
+    width: 100%;
+    accent-color: var(--color-walnut);
+  }
+`;
+
+const SaveButton = styled(PrimaryButton)`
+  margin-top: 18px;
+`;
+
+const JourneyDesign = () => {
+  const navigate = useNavigate();
+  const stageRef = useRef(null);
+  const [charms] = useState(readCreatedCharms);
+  const [layout, setLayout] = useState(() => createInitialLayout(charms));
+  const [selectedKey, setSelectedKey] = useState(
+    () => charms[0]?.instanceId ?? (charms[0] ? `${charms[0].id}-0` : ""),
+  );
+
+  const getCharmKey = (charm, index) =>
+    charm.instanceId ?? `${charm.id}-${index}`;
+
+  const updateSelectedCharm = (changes) => {
+    if (!selectedKey) return;
+    setLayout((current) => ({
+      ...current,
+      [selectedKey]: { ...current[selectedKey], ...changes },
+    }));
+  };
+
+  const handlePointerDown = (event, key) => {
+    event.preventDefault();
+    setSelectedKey(key);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event, key) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const bounds = stageRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const x = Math.min(88, Math.max(12, ((event.clientX - bounds.left) / bounds.width) * 100));
+    const y = Math.min(82, Math.max(20, ((event.clientY - bounds.top) / bounds.height) * 100));
+    setLayout((current) => ({
+      ...current,
+      [key]: { ...current[key], x, y },
+    }));
+  };
+
+  const handleSave = () => {
+    localStorage.setItem(CHARM_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+    navigate("/journey/charm", { state: { createdCharms: charms } });
+  };
+
+  const selectedLayout = layout[selectedKey];
+
+  return (
+    <Page>
+      <BackButton type="button" aria-label="이전 페이지" onClick={() => navigate(-1)}>
+        <TbArrowLeft aria-hidden="true" />
+      </BackButton>
+
+      <Intro>
+        <TitleRow>
+          <PencilIcon aria-hidden="true" />
+          <Title>Charm 꾸미기</Title>
+        </TitleRow>
+        <DescriptionRow>
+          <AccentLine aria-hidden="true" />
+          <Description>
+            완성된 Charm을 자유롭게 배치해,
+            <br />
+            나만의 스타일로 MCM을 꾸며보세요.
+          </Description>
+        </DescriptionRow>
+      </Intro>
+
+      {charms.length > 0 ? (
+        <>
+          <BagStage ref={stageRef}>
+            <BagImage src={bagImage} alt="MCM 가방" draggable="false" />
+            {charms.map((charm, index) => {
+              const key = getCharmKey(charm, index);
+              const itemLayout = layout[key];
+              if (!itemLayout) return null;
+              return (
+                <PlacedCharm
+                  key={key}
+                  type="button"
+                  aria-label={`Charm ${index + 1} 이동`}
+                  $selected={selectedKey === key}
+                  $x={itemLayout.x}
+                  $y={itemLayout.y}
+                  $size={itemLayout.size}
+                  $rotation={itemLayout.rotation}
+                  onPointerDown={(event) => handlePointerDown(event, key)}
+                  onPointerMove={(event) => handlePointerMove(event, key)}
+                >
+                  <img src={charm.imageUrl} alt="" draggable="false" />
+                </PlacedCharm>
+              );
+            })}
+          </BagStage>
+
+          <CharmShelf aria-label="생성된 Charm 목록">
+            {charms.map((charm, index) => {
+              const key = getCharmKey(charm, index);
+              return (
+                <CharmThumbnail
+                  key={key}
+                  type="button"
+                  $selected={selectedKey === key}
+                  aria-label={`Charm ${index + 1} 선택`}
+                  onClick={() => setSelectedKey(key)}
+                >
+                  <img src={charm.imageUrl} alt="" />
+                </CharmThumbnail>
+              );
+            })}
+          </CharmShelf>
+        </>
+      ) : (
+        <EmptyMessage>생성된 Charm이 없습니다.</EmptyMessage>
+      )}
+
+      <Controls $visible={Boolean(selectedLayout)} aria-label="Charm 편집 도구">
+        <Control>
+          <TbRotate2 aria-hidden="true" />
+          <input
+            type="range"
+            min="-180"
+            max="180"
+            value={selectedLayout?.rotation ?? 0}
+            aria-label="Charm 회전"
+            onChange={(event) =>
+              updateSelectedCharm({ rotation: Number(event.target.value) })
+            }
+          />
+        </Control>
+        <Control>
+          <TbArrowsDiagonal2 aria-hidden="true" />
+          <input
+            type="range"
+            min="30"
+            max="100"
+            value={selectedLayout?.size ?? 54}
+            aria-label="Charm 크기"
+            onChange={(event) =>
+              updateSelectedCharm({ size: Number(event.target.value) })
+            }
+          />
+        </Control>
+      </Controls>
+
+      <SaveButton
+        disabled={charms.length === 0}
+        onClick={handleSave}
+      >
+        저장
+      </SaveButton>
+    </Page>
+  );
+};
 
 export default JourneyDesign;
