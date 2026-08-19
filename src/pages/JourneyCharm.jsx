@@ -130,16 +130,32 @@ const BagImage = styled.img`
   object-fit: contain;
 `;
 
-const AddedCharm = styled.img`
+const AddedCharm = styled.button`
   position: absolute;
   z-index: 1;
   top: ${({ $position }) => $position.top};
   left: ${({ $position }) => $position.left};
   width: clamp(35px, 16%, 50px);
   height: 27%;
-  object-fit: contain;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.14));
   transform: translate(-50%, -50%) rotate(${({ $position }) => $position.rotate});
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  &:focus-visible {
+    border-radius: 8px;
+    outline: 2px solid var(--color-walnut);
+    outline-offset: 2px;
+  }
 `;
 
 const VerifyButton = styled(PrimaryButton)`
@@ -196,10 +212,17 @@ const JourneyCharm = () => {
           return (
             <AddedCharm
               key={charm.instanceId ?? `${charm.id}-${index}`}
-              src={charm.imageUrl}
-              alt={`생성한 Charm ${index + 1}`}
+              type="button"
+              aria-label={`생성한 Charm ${index + 1} 상세 보기`}
               $position={position}
-            />
+              onClick={() =>
+                navigate("/journey/detail", {
+                  state: { selectedCharm: charm, selectedIndex: index },
+                })
+              }
+            >
+              <img src={charm.imageUrl} alt="" />
+            </AddedCharm>
           );
         })}
       </BagStage>
