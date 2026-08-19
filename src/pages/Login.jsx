@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 
+import { apiPost } from "../utils/api";
 import headerBg from "../assets/login-header-bg.png";
 
 /* ───────────────────── 랜덤 문구 ───────────────────── */
@@ -265,6 +266,7 @@ const Login = () => {
 
   const [errors, setErrors] = useState({ userId: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   /* ── 유효성 검사 ── */
   const validate = () => {
@@ -295,15 +297,19 @@ const Login = () => {
 
     if (!validate()) return;
 
-    try {
-      // TODO: 실제 API 연동 시 교체
-      // 임시 로그인 로직 (demo: admin / 1234)
-      const isSuccess = userId === "admin" && password === "1234";
+    setIsLoading(true);
 
-      if (!isSuccess) {
-        setLoginError("아이디 또는 비밀번호가 일치하지 않습니다");
-        return;
-      }
+    try {
+      // BE: POST /auth — { loginId, password } → { userId, accessToken, nickname }
+      const { data } = await apiPost("/auth", {
+        loginId: userId,
+        password,
+      });
+
+      // 토큰 및 사용자 정보 저장
+      localStorage.setItem("accessToken", data.accessToken);
+      localStorage.setItem("userId", String(data.userId));
+      localStorage.setItem("nickname", data.nickname);
 
       // 아이디 저장
       if (saveId) {
@@ -312,9 +318,24 @@ const Login = () => {
         localStorage.removeItem("saved_user_id");
       }
 
-      navigate("/home");
-    } catch {
-      setLoginError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      navigate("/mypage");
+    } catch (err) {
+      // BE 에러 응답 구조: { error: { code: "UNAUTHORIZED" | "VALIDATION_FAILED", message: "..." } }
+      // - 401 UNAUTHORIZED: 아이디 미존재 또는 비밀번호 불일치 (보안상 구분하지 않음)
+      // - 400 VALIDATION_FAILED: 서버측 입력값 검증 실패 (빈 값 등)
+      // - 네트워크 에러: err.status 없음 (fetch TypeError)
+      if (!err.status) {
+        // 네트워크 에러 (서버 연결 불가)
+        setLoginError("서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+      } else if (err.status === 401) {
+        setLoginError("아이디 또는 비밀번호가 일치하지 않습니다");
+      } else if (err.status === 400 && err.code === "VALIDATION_FAILED") {
+        setLoginError("아이디와 비밀번호를 올바르게 입력해주세요");
+      } else {
+        setLoginError(err.message || "로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -390,7 +411,9 @@ const Login = () => {
         </CheckboxRow>
 
         {/* 로그인 버튼 */}
-        <LoginButton type="submit">로그인</LoginButton>
+        <LoginButton type="submit" disabled={isLoading}>
+          {isLoading ? "로그인 중..." : "로그인"}
+        </LoginButton>
 
         {/* 회원가입 링크 (로그인 버튼 바로 아래) */}
         <SignUpLink>
