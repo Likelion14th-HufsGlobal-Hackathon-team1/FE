@@ -51,9 +51,11 @@ const Description = styled.p`
 
 const UploadArea = styled.button`
   display: grid;
-  width: 100%;
-  min-height: 229px;
+  width: ${({ $hasPhoto }) => ($hasPhoto ? "fit-content" : "100%")};
+  max-width: 100%;
+  min-height: ${({ $hasPhoto }) => ($hasPhoto ? "0" : "229px")};
   margin-top: 44px;
+  align-self: ${({ $hasPhoto }) => ($hasPhoto ? "center" : "stretch")};
   place-items: center;
   border: 0;
   padding: 0;
@@ -89,8 +91,11 @@ const UploadGuide = styled.span`
 
 const Preview = styled.img`
   display: block;
-  width: calc(100% - 16px);
-  height: 213px;
+  width: auto;
+  max-width: min(100%, 320px);
+  height: auto;
+  max-height: min(38svh, 300px);
+  border-radius: 30px;
   object-fit: contain;
 `;
 
@@ -141,7 +146,7 @@ const CareUpload = () => {
       return;
     }
 
-    navigate("/care/result", { state: { previewUrl } });
+    navigate("/care/result", { state: { photo } });
   };
 
   return (
