@@ -627,7 +627,7 @@ const Mypage = () => {
                 // DEMO ONLY - 오픈된 상태 UI
                 <OpenedState>
                   <DDayText>D-Day</DDayText>
-                  <OpenButton onClick={() => navigate("/capsule-letter")}>
+                  <OpenButton onClick={() => { sessionStorage.removeItem("capsule_intro_shown"); navigate("/capsule-detail"); }}>
                     open
                   </OpenButton>
                 </OpenedState>
