@@ -276,7 +276,9 @@ const CareResult = () => {
         ))}
       </AnalysisCard>
 
-      <StoreButton icon={<TbSearch />}>MCM 케어 상담 예약하기</StoreButton>
+      <StoreButton icon={<TbSearch />} onClick={() => navigate("/reservation")}>
+        MCM 케어 상담 예약하기
+      </StoreButton>
     </Page>
   );
 };

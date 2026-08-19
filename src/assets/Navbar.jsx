@@ -7,7 +7,7 @@ import journeyIcon from "./navbar-icons/journey.svg";
 import mypageIcon from "./navbar-icons/mypage.svg";
 
 const NAV_ITEMS = [
-  { label: "Home", to: "/", icon: homeIcon, matches: (path) => path === "/" },
+  { label: "Home", to: "/home", icon: homeIcon, matches: (path) => path === "/home" },
   {
     label: "Care",
     to: "/care/upload",

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { AiOutlineClose } from "react-icons/ai";
 import { TbSearch } from "react-icons/tb";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import charmBag from "../assets/charm-bag.svg";
@@ -392,6 +392,39 @@ const ReminderMessage = styled.p`
   word-break: keep-all;
 `;
 
+const CompleteModal = styled(ReminderModal)`
+  width: min(340px, calc(100vw - 40px));
+  min-height: 430px;
+  padding: 56px 24px 28px;
+`;
+
+const CompleteMessage = styled.p`
+  margin: 34px 0 22px;
+  font: 300 14px/1.55 var(--font-kopub);
+  word-break: keep-all;
+`;
+
+const ReservationDetails = styled.dl`
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 13px 0;
+  margin: 0;
+  padding: 20px 8px 0;
+  border-top: 1px solid #a99884;
+  color: #33251f;
+  font: 300 13px/1.2 var(--font-kopub);
+  text-align: left;
+
+  dt, dd { margin: 0; }
+  dt { border-right: 1px solid #a99884; }
+  dd { padding-left: 13px; }
+`;
+
+const CompleteButton = styled.button`
+  width: 100%; height: 41px; margin-top: 30px; border: 0; border-radius: 24px;
+  color: #fff; background: var(--color-walnut); font: 300 15px var(--font-kopub); cursor: pointer;
+`;
+
 const CareBookingButton = styled.button`
   display: flex;
   width: 100%;
@@ -423,15 +456,23 @@ const CareBookingButton = styled.button`
 
 const Home = () => {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const reservation = state?.reservationComplete;
   const [flippedCards, setFlippedCards] = useState(() => new Set());
   const [careAlert, setCareAlert] = useState(true);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [showCareReminder, setShowCareReminder] = useState(
-    CARE_REMINDER.shouldShow,
+    CARE_REMINDER.shouldShow && !reservation,
   );
+  const [showReservationComplete, setShowReservationComplete] = useState(Boolean(reservation));
   const cardViewport = useRef(null);
   const dragState = useRef(null);
   const suppressCardClick = useRef(false);
+
+  const closeReservationComplete = () => {
+    setShowReservationComplete(false);
+    navigate("/home", { replace: true, state: null });
+  };
 
   const handlePointerDown = (event) => {
     dragState.current = {
@@ -605,6 +646,27 @@ const Home = () => {
           <CharmImage src={charmBag} alt="참 장식이 달린 MCM 가방" />
         </CharmSection>
       </MainContent>
+
+      {showReservationComplete && reservation && (
+        <ModalLayer>
+          <CompleteModal role="dialog" aria-modal="true" aria-labelledby="reservation-complete-title" aria-describedby="reservation-complete-description">
+            <CloseButton type="button" aria-label="예약 완료 안내 닫기" onClick={closeReservationComplete}>
+              <AiOutlineClose aria-hidden="true" />
+            </CloseButton>
+            <ReminderTitle id="reservation-complete-title">Reservation Complete</ReminderTitle>
+            <CompleteMessage id="reservation-complete-description">
+              케어 상담 예약이 완료되었어요.<br />예약한 일정에 제품과 함께<br />MCM 매장을 방문해주세요.
+            </CompleteMessage>
+            <ReservationDetails>
+              <dt>DATE</dt><dd>{reservation.date}</dd>
+              <dt>TIME</dt><dd>{reservation.time}</dd>
+              <dt>CARE</dt><dd>{reservation.care}</dd>
+              <dt>STORE</dt><dd>{reservation.store}</dd>
+            </ReservationDetails>
+            <CompleteButton type="button" onClick={closeReservationComplete}>확인 완료</CompleteButton>
+          </CompleteModal>
+        </ModalLayer>
+      )}
 
       {showCareReminder && (
         <ModalLayer>

@@ -21,6 +21,8 @@ import JourneyDetail from "./pages/JourneyDetail";
 import CapsuleDetail from "./pages/CapsuleDetail";
 import CharmDetail from "./pages/CharmDetail";
 import ProductRegistration from "./pages/ProductRegistration";
+import Landing from "./pages/Landing";
+import Reservation from "./pages/Reservation";
 
 const AppContent = styled.main`
   min-height: 100svh;
@@ -29,7 +31,7 @@ const AppContent = styled.main`
     props.$hideNav ? "0" : "calc(105px + env(safe-area-inset-bottom))"};
 `;
 
-const HIDE_NAV_PATHS = ["/login", "/signup"];
+const HIDE_NAV_PATHS = ["/", "/login", "/signup", "/landing"];
 
 function AppLayout() {
   const { pathname } = useLocation();
@@ -39,7 +41,8 @@ function AppLayout() {
     <>
       <AppContent $hideNav={hideNav}>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/home" element={<Home />} />
 
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
@@ -58,6 +61,8 @@ function AppLayout() {
           <Route path="/capsule-detail" element={<CapsuleDetail />} />
           <Route path="/charm-detail" element={<CharmDetail />} />
           <Route path="/product-registration" element={<ProductRegistration />} />
+          <Route path="/landing" element={<Landing />} />
+          <Route path="/reservation" element={<Reservation />} />
         </Routes>
       </AppContent>
       {!hideNav && <Navbar />}
