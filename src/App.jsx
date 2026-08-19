@@ -18,7 +18,8 @@ import JourneyMake from "./pages/JourneyMake";
 import JourneyDesign from "./pages/JourneyDesign";
 import JourneyCharm from "./pages/JourneyCharm";
 import JourneyDetail from "./pages/JourneyDetail";
-import CapsuleLetter from "./pages/CapsuleLetter";
+import CapsuleDetail from "./pages/CapsuleDetail";
+import CharmDetail from "./pages/CharmDetail";
 import ProductRegistration from "./pages/ProductRegistration";
 
 const AppContent = styled.main`
@@ -54,7 +55,8 @@ function AppLayout() {
           <Route path="/journey/design" element={<JourneyDesign />} />
           <Route path="/journey/charm" element={<JourneyCharm />} />
           <Route path="/journey/detail" element={<JourneyDetail />} />
-          <Route path="/capsule-letter" element={<CapsuleLetter />} />
+          <Route path="/capsule-detail" element={<CapsuleDetail />} />
+          <Route path="/charm-detail" element={<CharmDetail />} />
           <Route path="/product-registration" element={<ProductRegistration />} />
         </Routes>
       </AppContent>
