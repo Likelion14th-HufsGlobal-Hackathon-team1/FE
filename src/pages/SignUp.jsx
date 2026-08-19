@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 
+import { apiPost } from "../utils/api";
 import headerBg from "../assets/login-header-bg.png";
 
 /* ───────────────────── 랜덤 문구 ───────────────────── */
@@ -264,6 +265,7 @@ const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -295,8 +297,8 @@ const SignUp = () => {
     if (!form.password) {
       next.password = "비밀번호를 입력해주세요";
       valid = false;
-    } else if (form.password.length < 4) {
-      next.password = "비밀번호는 4자 이상이어야 합니다";
+    } else if (form.password.length < 8) {
+      next.password = "비밀번호는 8자 이상이어야 합니다";
       valid = false;
     }
 
@@ -318,13 +320,57 @@ const SignUp = () => {
   };
 
   /* ── 제출 ── */
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validate()) return;
 
-    // TODO: 실제 API 연동 시 교체
-    navigate("/login");
+    setIsLoading(true);
+
+    try {
+      // BE: POST /users — { name, nickname, email, loginId, password } → 201 { userId, nickname }
+      // email은 BE 필수 필드이나 UI에서 수집하지 않으므로 더미값 자동 생성
+      await apiPost("/users", {
+        name: form.name.trim(),
+        nickname: form.nickname.trim(),
+        email: `${form.userId.trim()}@mcm-archiv.local`,
+        loginId: form.userId.trim(),
+        password: form.password,
+      });
+
+      navigate("/login");
+    } catch (err) {
+      // err.status: 0 = 네트워크 에러, 400 = 검증 실패, 403 = CORS/권한, 그 외 = 서버 에러
+      console.error("[SignUp] 회원가입 실패:", err.status, err.code, err.message);
+
+      if (err.code === "NETWORK_ERROR" || err.status === 0) {
+        setErrors((prev) => ({
+          ...prev,
+          general: "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+        }));
+      } else if (err.status === 400) {
+        const msg = err.message || "";
+        if (msg.includes("아이디")) {
+          setErrors((prev) => ({ ...prev, userId: "이미 사용 중인 아이디입니다" }));
+        } else if (msg.includes("이메일")) {
+          setErrors((prev) => ({ ...prev, general: "이미 가입된 계정입니다" }));
+        } else {
+          setErrors((prev) => ({ ...prev, general: msg || "입력값을 확인해주세요" }));
+        }
+      } else if (err.status === 403) {
+        setErrors((prev) => ({
+          ...prev,
+          general: "서버 접근이 거부되었습니다. 잠시 후 다시 시도해주세요.",
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          general: err.message || "회원가입 중 오류가 발생했습니다. 다시 시도해주세요.",
+        }));
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -470,8 +516,15 @@ const SignUp = () => {
           <ErrorText role="alert">{errors.agreement}</ErrorText>
         )}
 
+        {/* 서버 에러 (일반) */}
+        {errors.general && (
+          <ErrorText role="alert">{errors.general}</ErrorText>
+        )}
+
         {/* 회원가입 버튼 */}
-        <SubmitButton type="submit">회원가입</SubmitButton>
+        <SubmitButton type="submit" disabled={isLoading}>
+          {isLoading ? "가입 처리 중..." : "회원가입"}
+        </SubmitButton>
       </FormSection>
     </PageWrapper>
   );

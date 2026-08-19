@@ -1,4 +1,8 @@
-const BASE_URL = "http://1.201.116.149:8080";
+// 개발 환경: Vite proxy가 /api → http://1.201.116.149:8080 으로 포워딩
+// 프로덕션 환경: 직접 서버 URL 사용
+const BASE_URL = import.meta.env.DEV
+  ? "/api"
+  : "http://1.201.116.149:8080";
 
 /**
  * 공통 fetch 래퍼.
@@ -19,17 +23,40 @@ export async function apiFetch(path, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (networkErr) {
+    // fetch 자체 실패 (네트워크 끊김, CORS 차단 등)
+    const error = new Error(
+      "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
+    );
+    error.status = 0;
+    error.code = "NETWORK_ERROR";
+    throw error;
+  }
 
   // 204 No Content 등 body 없는 응답
   if (response.status === 204) {
     return { ok: true, status: 204, data: null };
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    // JSON 파싱 실패 시
+    if (!response.ok) {
+      const error = new Error(`요청에 실패했습니다 (${response.status})`);
+      error.status = response.status;
+      error.code = "PARSE_ERROR";
+      throw error;
+    }
+    return { ok: true, status: response.status, data: null };
+  }
 
   if (!response.ok) {
     // BE 공통 에러 형식: { error: { code, message } }
