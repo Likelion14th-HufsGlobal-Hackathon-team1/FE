@@ -31,6 +31,7 @@ const REGISTERED_PRODUCTS = [
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 11 }, (_, index) => CURRENT_YEAR - 9 + index);
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
+const JOURNEYS_STORAGE_KEY = "onepick-journeys";
 
 const Page = styled.main`
   width: min(100%, 480px);
@@ -389,6 +390,32 @@ const JourneyTrip = () => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+
+    const selectedProduct = REGISTERED_PRODUCTS.find(
+      (item) => item.id === product,
+    );
+    const journey = {
+      id: `journey-${Date.now()}`,
+      date: { year, month, day },
+      country: country === "직접 입력" ? customCountry.trim() : country,
+      city: city.trim(),
+      product: selectedProduct ?? null,
+      photos,
+    };
+
+    let savedJourneys = [];
+    try {
+      const parsedJourneys = JSON.parse(
+        localStorage.getItem(JOURNEYS_STORAGE_KEY) ?? "[]",
+      );
+      if (Array.isArray(parsedJourneys)) savedJourneys = parsedJourneys;
+    } catch {
+      savedJourneys = [];
+    }
+    localStorage.setItem(
+      JOURNEYS_STORAGE_KEY,
+      JSON.stringify([...savedJourneys, journey]),
+    );
     navigate("/journey/make");
   };
 
