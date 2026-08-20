@@ -5,6 +5,7 @@ import styled from "styled-components";
 import profileImg from "../assets/profile.png";
 import userImg from "../assets/user.png";
 import { apiGet } from "../utils/api";
+import { fillProductImagesFromJourneys } from "../utils/productImages";
 
 /* ───────────────────── 스타일 ───────────────────── */
 const PageWrapper = styled.div`
@@ -228,7 +229,7 @@ const CollectionGrid = styled.div`
   margin-bottom: 28px;
 `;
 
-const ItemCard = styled.div`
+const ItemCard = styled.button`
   position: relative;
   background: var(--color-cream);
   border: 1px solid var(--color-soft-taupe);
@@ -236,12 +237,21 @@ const ItemCard = styled.div`
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-walnut);
+    outline-offset: 2px;
+  }
 `;
 
 const ItemImageWrapper = styled.div`
   width: 100%;
   height: 160px;
-  background: var(--color-soft-taupe);
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -415,8 +425,10 @@ const Mypage = () => {
       try {
         console.info("[MyPage Collection 1/2] 등록 제품을 조회합니다. GET /api/products");
         const { data } = await apiGet("/products");
+        const list = Array.isArray(data?.products) ? data.products : [];
+        const productsWithImages = await fillProductImagesFromJourneys(list);
         if (!active) return;
-        setProducts(Array.isArray(data?.products) ? data.products : []);
+        setProducts(productsWithImages);
         console.info("[MyPage Collection 2/2] 등록 제품 컬렉션을 불러왔습니다.");
       } catch (loadError) {
         console.error("[MyPage Collection 오류] 등록 제품을 불러오지 못했습니다.", loadError);
@@ -490,7 +502,11 @@ const Mypage = () => {
 
       <CollectionGrid>
         {products.slice(0, 2).map((item) => (
-          <ItemCard key={item.productId}>
+          <ItemCard
+            key={item.productId}
+            type="button"
+            onClick={() => navigate("/capsule-detail", { state: { productId: item.productId } })}
+          >
             <ItemImageWrapper>
               <ItemImage src={item.productImage} alt={item.productName} />
             </ItemImageWrapper>

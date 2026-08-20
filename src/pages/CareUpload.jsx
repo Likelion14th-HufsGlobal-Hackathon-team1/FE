@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { RiArrowDropDownLine } from "react-icons/ri";
-import { TbPhoto, TbPhotoPlus, TbWand } from "react-icons/tb";
+import { TbWand } from "react-icons/tb";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
@@ -12,7 +12,7 @@ const Page = styled.main`
   width: min(100%, 480px);
   min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 65px clamp(20px, 7.7vw, 37px) 74px;
+  padding: 65px clamp(20px, 7.7vw, 37px) 20px;
   flex-direction: column;
   color: #090a0a;
   background: var(--color-ivory-paper);
@@ -51,63 +51,15 @@ const Description = styled.p`
   font: 300 12px/1.45 var(--font-kopub);
 `;
 
-const UploadArea = styled.button`
-  display: grid;
-  width: ${({ $hasPhoto }) => ($hasPhoto ? "fit-content" : "100%")};
-  max-width: 100%;
-  min-height: ${({ $hasPhoto }) => ($hasPhoto ? "0" : "229px")};
-  margin-top: 44px;
-  align-self: ${({ $hasPhoto }) => ($hasPhoto ? "center" : "stretch")};
-  place-items: center;
-  border: 0;
-  padding: 0;
-  overflow: hidden;
-  background: ${({ $hasPhoto }) =>
-    $hasPhoto
-      ? "transparent"
-      : `
-        repeating-linear-gradient(to right, var(--color-walnut) 0 19px, transparent 19px 37px) top / 100% 1.5px no-repeat,
-        repeating-linear-gradient(to right, var(--color-walnut) 0 19px, transparent 19px 37px) bottom / 100% 1.5px no-repeat,
-        repeating-linear-gradient(to bottom, var(--color-walnut) 0 19px, transparent 19px 37px) left / 1.5px 100% no-repeat,
-        repeating-linear-gradient(to bottom, var(--color-walnut) 0 19px, transparent 19px 37px) right / 1.5px 100% no-repeat
-      `};
-  color: var(--color-soft-taupe);
-  cursor: pointer;
-
-  &:focus-visible { outline: 2px solid var(--color-walnut); outline-offset: 4px; }
-
-  @media (max-height: 720px) {
-    margin-top: 28px;
-  }
-`;
-
-const UploadGuide = styled.span`
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 12px;
-  font: 300 11px/1.4 var(--font-kopub);
-
-  svg { width: 35px; height: 35px; }
-`;
-
 const Preview = styled.img`
   display: block;
+  margin: 32px auto 0;
   width: auto;
   max-width: min(100%, 320px);
   height: auto;
   max-height: min(38svh, 300px);
   border-radius: 30px;
   object-fit: contain;
-`;
-
-const HiddenInput = styled.input`
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 `;
 
 const ProductDropdown = styled.div`
@@ -200,19 +152,16 @@ const ErrorMessage = styled.p`
 `;
 
 const ActionButton = styled(PrimaryButton)`
-  margin-top: 45px;
+  margin-top: clamp(48px, 10svh, 96px);
 
   @media (max-height: 720px) {
-    margin-top: 28px;
+    margin-top: 40px;
   }
 `;
 
 const CareUpload = () => {
   const navigate = useNavigate();
-  const inputRef = useRef(null);
   const productDropdownRef = useRef(null);
-  const [photo, setPhoto] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState("");
   const [publicImageUrl, setPublicImageUrl] = useState("");
   const [products, setProducts] = useState([]);
   const [productId, setProductId] = useState("");
@@ -255,35 +204,13 @@ const CareUpload = () => {
     return () => document.removeEventListener("pointerdown", closeDropdown);
   }, []);
 
-  useEffect(() => {
-    if (!photo) {
-      setPreviewUrl("");
-      return undefined;
-    }
-
-    const objectUrl = URL.createObjectURL(photo);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [photo]);
-
-  const openFilePicker = () => inputRef.current?.click();
   const selectedProduct = products.find((product) => String(product.id) === productId);
   const publicPreviewUrl = /^https?:\/\//i.test(publicImageUrl.trim()) ? publicImageUrl.trim() : "";
-  const activePreviewUrl = publicPreviewUrl || previewUrl;
-
-  const handlePhotoChange = (event) => {
-    const selectedPhoto = event.target.files?.[0];
-    if (selectedPhoto) {
-      setPhoto(selectedPhoto);
-      setPublicImageUrl("");
-      setError("");
-    }
-  };
 
   const handleAction = async () => {
     const normalizedPublicUrl = publicImageUrl.trim();
-    if (!photo && !normalizedPublicUrl) {
-      openFilePicker();
+    if (!normalizedPublicUrl) {
+      setError("분석할 이미지 URL을 입력해주세요.");
       return;
     }
     if (!productId) {
@@ -297,15 +224,8 @@ const CareUpload = () => {
       if (normalizedPublicUrl && !/^https?:\/\//i.test(normalizedPublicUrl)) {
         throw new Error("http:// 또는 https://로 시작하는 공개 이미지 URL을 입력해주세요.");
       }
-      console.info(normalizedPublicUrl
-        ? "[Care 3/6] 입력한 공개 이미지 URL을 사용합니다."
-        : "[Care 3/6] 사진을 API 전송 형식으로 변환합니다.");
-      const imageUrl = normalizedPublicUrl || await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error("사진을 읽지 못했습니다."));
-          reader.readAsDataURL(photo);
-        });
+      console.info("[Care 3/6] 입력한 이미지 URL을 사용합니다.");
+      const imageUrl = normalizedPublicUrl;
       console.info("[Care 4/6] AI 케어 분석을 요청합니다. POST /api/care/reports", { productId: Number(productId) });
       const { data, status } = await apiPost("/care/reports", {
         productId: Number(productId),
@@ -359,42 +279,21 @@ const CareUpload = () => {
           value={publicImageUrl}
           onChange={(event) => {
             setPublicImageUrl(event.target.value);
-            setPhoto(null);
             setError("");
           }}
         />
       </UrlField>
 
-      <HiddenInput
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        aria-label="가방 사진 선택"
-        onChange={handlePhotoChange}
-      />
+      {publicPreviewUrl && (
+        <Preview
+          src={publicPreviewUrl}
+          alt="분석할 가방 미리보기"
+          onError={() => setError("입력한 이미지 URL을 불러올 수 없습니다.")}
+        />
+      )}
 
-      <UploadArea
-        type="button"
-        aria-label="가방 사진 업로드"
-        $hasPhoto={Boolean(activePreviewUrl)}
-        onClick={openFilePicker}
-      >
-        {activePreviewUrl ? (
-          <Preview
-            src={activePreviewUrl}
-            alt="분석할 가방 미리보기"
-            onError={() => setError("입력한 이미지 URL을 불러올 수 없습니다.")}
-          />
-        ) : (
-          <UploadGuide>
-            <TbPhotoPlus aria-hidden="true" />
-            <span>분석하고 싶은 가방 사진을 업로드 해주세요.</span>
-          </UploadGuide>
-        )}
-      </UploadArea>
-
-      <ActionButton icon={photo || publicImageUrl.trim() ? <TbWand /> : <TbPhoto />} disabled={isAnalyzing} onClick={handleAction}>
-        {isAnalyzing ? "AI 분석 중..." : photo || publicImageUrl.trim() ? "분석 결과 확인" : "사진 업로드"}
+      <ActionButton icon={<TbWand />} disabled={isAnalyzing} onClick={handleAction}>
+        {isAnalyzing ? "AI 분석 중..." : "분석 결과 확인"}
       </ActionButton>
       {error && <ErrorMessage role="alert">{error}</ErrorMessage>}
     </Page>

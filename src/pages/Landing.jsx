@@ -48,7 +48,7 @@ const StartButton = styled.button`
   display: flex;
   width: 100%;
   height: 56px;
-  margin-top: auto;
+  margin-top: clamp(48px, 10svh, 96px);
   align-items: center;
   justify-content: center;
   gap: 16px;
@@ -58,6 +58,10 @@ const StartButton = styled.button`
   background: var(--color-walnut);
   font: 300 clamp(16px, 4.5vw, 19px) / 1 var(--font-kopub);
   cursor: pointer;
+
+  @media (max-height: 720px) {
+    margin-top: 40px;
+  }
   transition: filter 160ms ease, transform 160ms ease;
 
   &:hover { filter: brightness(1.08); }

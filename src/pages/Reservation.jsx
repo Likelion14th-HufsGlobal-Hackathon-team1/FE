@@ -4,13 +4,14 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import { apiGet, apiPost } from "../utils/api";
+import { readStoredJson, STORAGE_KEYS, writeStoredJson } from "../utils/storage";
 
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const SEOUL_LOCATION = { lat: 37.5665, lng: 126.978 };
 const formatApiDate = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
 
 const Page = styled.main`
-  width: min(100%, 480px); min-height: 100svh; margin: 0 auto; padding: 28px 36px 34px;
+  display: flex; width: min(100%, 480px); min-height: calc(100svh - 105px - env(safe-area-inset-bottom)); margin: 0 auto; padding: 28px 36px 20px; flex-direction: column;
   color: #33251f; background: var(--color-ivory-paper); text-align: left;
   @media (max-width: 380px) { padding-inline: 24px; }
 `;
@@ -95,9 +96,11 @@ const OptionButton = styled.button`
   &:hover, &:focus-visible { color: ${({ $selected }) => ($selected ? "#fffaf2" : "#33251f")}; background: ${({ $selected }) => ($selected ? "var(--color-walnut)" : "rgba(182,168,146,.28)")}; outline: none; }
 `;
 const SubmitButton = styled.button`
-  display: flex; width: 100%; height: 54px; margin-top: 38px; align-items: center; justify-content: center; gap: 10px;
+  display: flex; width: 100%; height: 54px; margin-top: clamp(48px, 10svh, 96px); align-items: center; justify-content: center; gap: 10px;
   border: 0; border-radius: 28px; color: #fffaf2; background: var(--color-walnut); font: 400 17px var(--font-kopub); cursor: pointer;
   &:disabled { opacity: .45; cursor: not-allowed; }
+
+  @media (max-height: 720px) { margin-top: 40px; }
 `;
 const FormMessage = styled.p`
   margin: 12px 0 0; color: ${({ $error }) => ($error ? "#b42318" : "#8e8172")};
@@ -227,13 +230,13 @@ function Reservation() {
         reservationTime: selectedTime,
       });
       try {
-        const savedStores = JSON.parse(localStorage.getItem("care_reservation_stores") || "{}");
+        const savedStores = readStoredJson(STORAGE_KEYS.reservationStores);
         savedStores[String(careItem)] = selectedStore.name;
-        localStorage.setItem("care_reservation_stores", JSON.stringify(savedStores));
+        writeStoredJson(STORAGE_KEYS.reservationStores, savedStores);
 
-        const savedDates = JSON.parse(localStorage.getItem("care_reservation_dates") || "{}");
+        const savedDates = readStoredJson(STORAGE_KEYS.reservationDates);
         savedDates[String(careItem)] = reservationDate;
-        localStorage.setItem("care_reservation_dates", JSON.stringify(savedDates));
+        writeStoredJson(STORAGE_KEYS.reservationDates, savedDates);
       } catch {
         // 저장소를 사용할 수 없어도 예약 완료 화면은 정상적으로 표시합니다.
       }

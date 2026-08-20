@@ -8,16 +8,21 @@ import { apiGet } from "../utils/api";
 
 const GOOD_CONDITION_THRESHOLD = 70;
 
-const getStatus = (score) => score <= 33 ? "좋음" : score <= 66 ? "주의" : "케어 필요";
+const normalizeScore = (score) => Math.min(100, Math.max(0, Number(score) || 0));
+
+const getStatus = (score) => score >= 67 ? "좋음" : score >= 34 ? "주의" : "케어 필요";
 
 const toAnalysis = (report) => ({
-  overallCondition: report.totalScore ?? 0,
+  overallCondition: normalizeScore(report.totalScore),
   aiComment: report.aiComment ?? "",
   items: [
     { label: "표면 긁힘", score: report.scratchScore ?? 0, description: "AI가 표면의 긁힘과 마모 상태를 분석해요." },
     { label: "표면 오염도", score: report.stainScore ?? 0, description: "AI가 얼룩, 이염, 변색 등 표면의 오염 상태를 분석해요." },
     { label: "소재 컨디션", score: report.wearScore ?? 0, description: "AI가 소재의 노후화와 전반적인 컨디션을 분석해요." },
-  ].map((item) => ({ ...item, status: getStatus(item.score) })),
+  ].map((item) => {
+    const score = normalizeScore(item.score);
+    return { ...item, score, status: getStatus(score) };
+  }),
 });
 
 const STATUS_COLORS = {
@@ -31,7 +36,7 @@ const Page = styled.main`
   width: min(100%, 480px);
   min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 18px clamp(20px, 7.7vw, 37px) 58px;
+  padding: 18px clamp(20px, 7.7vw, 37px) 20px;
   flex-direction: column;
   color: #090a0a;
   background: var(--color-ivory-paper);
@@ -115,6 +120,12 @@ const SummaryText = styled.p`
   font: 300 14px/1.55 var(--font-kopub);
 `;
 
+const OverallScore = styled.p`
+  margin: 0 0 10px;
+  color: var(--color-walnut);
+  font: 500 18px/1.3 var(--font-kopub);
+`;
+
 const AnalysisCard = styled.section`
   margin-top: 25px;
   border-radius: 17px;
@@ -162,8 +173,8 @@ const ScaleLabels = styled.div`
   color: #8c8c8c;
   font: 300 8px/1 var(--font-kopub);
 
-  span:first-child { color: #18c954; }
-  span:last-child { color: #ff3b30; }
+  span:first-child { color: #ff3b30; }
+  span:last-child { color: #18c954; }
 `;
 
 const ProgressTrack = styled.div`
@@ -171,7 +182,7 @@ const ProgressTrack = styled.div`
   height: 12px;
   margin-top: 3px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #12d94d 0%, #46df39 34%, #ffd21a 62%, #ff3b30 100%);
+  background: linear-gradient(90deg, #ff3b30 0%, #ffd21a 38%, #46df39 66%, #12d94d 100%);
 `;
 
 const ProgressMarker = styled.span`
@@ -187,7 +198,11 @@ const ProgressMarker = styled.span`
 `;
 
 const StoreButton = styled(PrimaryButton)`
-  margin-top: 35px;
+  margin-top: clamp(48px, 10svh, 96px);
+
+  @media (max-height: 720px) {
+    margin-top: 40px;
+  }
 `;
 
 const ResultMessage = styled.p`
@@ -254,6 +269,7 @@ const CareResult = () => {
       </PhotoFrame>
 
       <Summary>
+        <OverallScore>전체 평가 점수 {analysis.overallCondition}점</OverallScore>
         {analysis.aiComment ? (
           <SummaryText>{analysis.aiComment}</SummaryText>
         ) : isGoodCondition ? (
@@ -280,7 +296,7 @@ const CareResult = () => {
               <Status $status={item.status}>{item.status}</Status>
             </ItemTitle>
             <ItemDescription>{item.description}</ItemDescription>
-            <ScaleLabels><span>좋음</span><span>케어 필요</span></ScaleLabels>
+            <ScaleLabels><span>케어 필요</span><span>좋음</span></ScaleLabels>
             <ProgressTrack>
               <ProgressMarker $score={item.score} aria-hidden="true" />
             </ProgressTrack>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import { apiGet } from "../utils/api";
+import { fillProductImagesFromJourneys } from "../utils/productImages";
 
 /* ───────────────────── 스타일 ───────────────────── */
 const PageWrapper = styled.div`
@@ -49,7 +50,7 @@ const CardList = styled.div`
   margin-bottom: 28px;
 `;
 
-const Card = styled.div`
+const Card = styled.button`
   position: relative;
   width: 100%;
   background: var(--color-cream);
@@ -59,13 +60,21 @@ const Card = styled.div`
   display: flex;
   gap: 16px;
   align-items: flex-start;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-walnut);
+    outline-offset: 2px;
+  }
 `;
 
 const CardImageWrapper = styled.div`
   width: 120px;
   height: 120px;
   border-radius: 10px;
-  background: var(--color-soft-taupe);
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -164,8 +173,10 @@ const CollectionAll = () => {
       try {
         console.info("[Collection 1/2] 등록 제품 전체 목록을 조회합니다. GET /api/products");
         const { data } = await apiGet("/products");
+        const list = Array.isArray(data?.products) ? data.products : [];
+        const productsWithImages = await fillProductImagesFromJourneys(list);
         if (!active) return;
-        setProducts(Array.isArray(data?.products) ? data.products : []);
+        setProducts(productsWithImages);
         console.info("[Collection 2/2] 등록 제품 전체 목록을 불러왔습니다.");
       } catch (loadError) {
         console.error("[Collection 오류] 등록 제품 전체 목록을 불러오지 못했습니다.", loadError);
@@ -193,7 +204,11 @@ const CollectionAll = () => {
       {/* 카드 리스트 */}
       <CardList>
         {products.map((item) => (
-          <Card key={item.productId}>
+          <Card
+            key={item.productId}
+            type="button"
+            onClick={() => navigate("/capsule-detail", { state: { productId: item.productId } })}
+          >
             <CardImageWrapper>
               <CardImage src={item.productImage} alt={item.productName} />
             </CardImageWrapper>
