@@ -10,9 +10,18 @@ const PageWrapper = styled.div`
   flex-direction: column;
   min-height: 100svh;
   background: var(--color-ivory-paper);
-  padding: 32px 20px 40px;
+  padding: 32px 20px calc(130px + env(safe-area-inset-bottom));
   max-width: 420px;
   margin: 0 auto;
+  height: 100svh;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 `;
 
 const BackButton = styled.button`
@@ -133,6 +142,124 @@ const ScanSuccess = styled.span`
   font-weight: 400;
   color: var(--color-walnut);
   margin-top: 4px;
+`;
+
+/* ── 제품 기본 정보 ── */
+const ProductFields = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 32px;
+`;
+
+const ProductField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const ProductLabel = styled.label`
+  font-family: var(--font-english);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-walnut);
+  text-align: left;
+`;
+
+const ProductInput = styled.input`
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--color-soft-taupe);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-walnut);
+  font-family: var(--font-kopub);
+  font-size: 14px;
+  outline: none;
+
+  &:focus {
+    border-color: var(--color-walnut);
+  }
+`;
+
+const DateSelects = styled.div`
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 8px;
+`;
+
+const DateDropdown = styled.div`
+  position: relative;
+  min-width: 0;
+`;
+
+const DateDropdownButton = styled.button`
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--color-soft-taupe);
+  border-radius: 8px;
+  background: var(--color-ivory-paper);
+  color: var(--color-walnut);
+  font-family: var(--font-kopub);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+
+  &:focus {
+    border-color: var(--color-walnut);
+  }
+`;
+
+const DropdownArrow = styled.span`
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: ${({ $open }) => $open ? "rotate(225deg) translate(-1px, -1px)" : "rotate(45deg) translate(-1px, -1px)"};
+`;
+
+const DateDropdownMenu = styled.div`
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 100%;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--color-soft-taupe);
+  border-radius: 14px;
+  background: var(--color-ivory-paper);
+  box-shadow: 0 8px 20px rgba(77, 49, 37, 0.14);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-soft-taupe) transparent;
+`;
+
+const DateDropdownOption = styled.button`
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: ${({ $selected }) => $selected ? "var(--color-walnut)" : "transparent"};
+  color: ${({ $selected }) => $selected ? "var(--color-cream)" : "var(--color-walnut)"};
+  font-family: var(--font-kopub);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: ${({ $selected }) => $selected ? "var(--color-walnut)" : "rgba(100, 68, 52, 0.1)"};
+    outline: none;
+  }
 `;
 
 /* ── 기억의 캡슐 활성화 섹션 ── */
@@ -265,6 +392,7 @@ const SubmitButton = styled.button`
   font-size: var(--font-size-button);
   font-weight: 400;
   cursor: pointer;
+  flex-shrink: 0;
   transition: opacity 200ms ease;
 
   &:hover {
@@ -299,12 +427,47 @@ const ArrowLeftIcon = () => (
   </svg>
 );
 
+const PurchaseDateDropdown = ({ label, value, options, open, onToggle, onSelect, ariaLabel }) => (
+  <DateDropdown>
+    <DateDropdownButton type="button" onClick={onToggle} aria-label={ariaLabel} aria-expanded={open}>
+      <span>{value || label}</span>
+      <DropdownArrow $open={open} aria-hidden="true" />
+    </DateDropdownButton>
+    {open && (
+      <DateDropdownMenu role="listbox" aria-label={ariaLabel}>
+        {options.map((option) => (
+          <DateDropdownOption
+            key={option}
+            type="button"
+            role="option"
+            aria-selected={String(value) === String(option)}
+            $selected={String(value) === String(option)}
+            onClick={() => onSelect(String(option))}
+          >
+            {option}
+          </DateDropdownOption>
+        ))}
+      </DateDropdownMenu>
+    )}
+  </DateDropdown>
+);
+
 /* ───────────────────── 컴포넌트 ───────────────────── */
 const ProductRegistration = () => {
   const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 30 }, (_, index) => currentYear - index);
+  const months = Array.from({ length: 12 }, (_, index) => index + 1);
+  const days = Array.from({ length: 31 }, (_, index) => index + 1);
 
   const [scanned, setScanned] = useState(false);
+  const [openDateDropdown, setOpenDateDropdown] = useState("");
   const [form, setForm] = useState({
+    productName: "",
+    productCode: "",
+    purchaseYear: "",
+    purchaseMonth: "",
+    purchaseDay: "",
     nickname: "",
     startDate: "",
     memory: "",
@@ -322,9 +485,32 @@ const ProductRegistration = () => {
     }
   };
 
+  const handleDateSelect = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setOpenDateDropdown("");
+    if (errors.purchaseDate) {
+      setErrors((prev) => ({ ...prev, purchaseDate: "" }));
+    }
+  };
+
   const validate = () => {
     const next = {};
     let valid = true;
+
+    if (!form.productName.trim()) {
+      next.productName = "제품명을 입력해주세요";
+      valid = false;
+    }
+
+    if (!form.productCode.trim()) {
+      next.productCode = "제품 코드를 입력해주세요";
+      valid = false;
+    }
+
+    if (!form.purchaseYear || !form.purchaseMonth || !form.purchaseDay) {
+      next.purchaseDate = "구매일을 선택해주세요";
+      valid = false;
+    }
 
     if (!form.nickname.trim()) {
       next.nickname = "가방 별칭을 입력해주세요";
@@ -349,7 +535,7 @@ const ProductRegistration = () => {
     if (!validate()) return;
 
     // 오픈 예정일 계산 (여정 시작일 + 10년)
-    const dateParts = form.startDate.replace(/[-.\/]/g, ".").split(".");
+    const dateParts = form.startDate.replace(/[-./]/g, ".").split(".");
     let openDate = form.startDate;
     if (dateParts.length >= 3) {
       const year = parseInt(dateParts[0], 10) + 10;
@@ -359,6 +545,9 @@ const ProductRegistration = () => {
     // 마이페이지 컬렉션에 추가 (localStorage 임시 저장)
     const newItem = {
       id: Date.now(),
+      productName: form.productName,
+      productCode: form.productCode,
+      purchaseDate: `${form.purchaseYear}-${String(form.purchaseMonth).padStart(2, "0")}-${String(form.purchaseDay).padStart(2, "0")}`,
       name: form.nickname || "새로 등록한 제품",
       startDate: form.startDate,
       openDate,
@@ -418,6 +607,64 @@ const ProductRegistration = () => {
           </ScanButton>
         )}
       </ScanCard>
+
+      <ProductFields>
+        <ProductField>
+          <ProductLabel htmlFor="pr-product-name">PRODUCT NAME</ProductLabel>
+          <ProductInput
+            id="pr-product-name"
+            type="text"
+            value={form.productName}
+            onChange={handleChange("productName")}
+          />
+          {errors.productName && <ErrorText role="alert">{errors.productName}</ErrorText>}
+        </ProductField>
+
+        <ProductField>
+          <ProductLabel htmlFor="pr-product-code">PRODUCT CODE</ProductLabel>
+          <ProductInput
+            id="pr-product-code"
+            type="text"
+            value={form.productCode}
+            onChange={handleChange("productCode")}
+          />
+          {errors.productCode && <ErrorText role="alert">{errors.productCode}</ErrorText>}
+        </ProductField>
+
+        <ProductField>
+          <ProductLabel htmlFor="pr-purchase-year">PURCHASE DATE</ProductLabel>
+          <DateSelects>
+            <PurchaseDateDropdown
+              label="Year"
+              value={form.purchaseYear}
+              options={years}
+              open={openDateDropdown === "year"}
+              onToggle={() => setOpenDateDropdown((current) => current === "year" ? "" : "year")}
+              onSelect={(value) => handleDateSelect("purchaseYear", value)}
+              ariaLabel="구매 연도"
+            />
+            <PurchaseDateDropdown
+              label="Month"
+              value={form.purchaseMonth}
+              options={months}
+              open={openDateDropdown === "month"}
+              onToggle={() => setOpenDateDropdown((current) => current === "month" ? "" : "month")}
+              onSelect={(value) => handleDateSelect("purchaseMonth", value)}
+              ariaLabel="구매 월"
+            />
+            <PurchaseDateDropdown
+              label="Date"
+              value={form.purchaseDay}
+              options={days}
+              open={openDateDropdown === "date"}
+              onToggle={() => setOpenDateDropdown((current) => current === "date" ? "" : "date")}
+              onSelect={(value) => handleDateSelect("purchaseDay", value)}
+              ariaLabel="구매 일"
+            />
+          </DateSelects>
+          {errors.purchaseDate && <ErrorText role="alert">{errors.purchaseDate}</ErrorText>}
+        </ProductField>
+      </ProductFields>
 
       {/* 기억의 캡슐 활성화 */}
       <SectionTitle>기억의 캡슐 활성화</SectionTitle>
