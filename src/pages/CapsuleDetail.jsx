@@ -71,11 +71,13 @@ const IntroText = styled.p`
 const PageWrapper = styled.div`
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-height: 100svh;
   background: var(--color-ivory-paper);
   max-width: 420px;
   margin: 0 auto;
   position: relative;
+  box-sizing: border-box;
 `;
 
 const TopBar = styled.header`
@@ -111,9 +113,11 @@ const TopTitle = styled.h1`
 `;
 
 /* ── 마스킹테이프 탭 ── */
+const TAB_WIDTH = 48;
+
 const TapeTabs = styled.div`
   position: absolute;
-  right: -56px;
+  right: -${TAB_WIDTH}px;
   top: 180px;
   z-index: 200;
   display: flex;
@@ -123,8 +127,8 @@ const TapeTabs = styled.div`
 `;
 
 const TapeTab = styled.button`
-  width: 56px;
-  padding: 12px 8px;
+  width: ${TAB_WIDTH}px;
+  padding: 12px 5px;
   border: none;
   cursor: pointer;
   font-family: var(--font-english);
@@ -154,9 +158,16 @@ const TapeTab = styled.button`
 /* ── 컨텐츠 ── */
 const ContentArea = styled.div`
   flex: 1;
-  padding: 0 16px 8px;
+  /* 카드 밖으로 돌출되는 책갈피 너비만큼 오른쪽 공간을 확보한다. */
+  padding: 0 ${TAB_WIDTH + 16}px 8px 16px;
   animation: ${fadeInUp} 0.4s ease;
   overflow: visible;
+  box-sizing: border-box;
+
+  @media (max-width: 360px) {
+    padding-right: ${TAB_WIDTH + 10}px;
+    padding-left: 10px;
+  }
 `;
 
 /* ── 고정 크기 다이어리 카드 ── */
@@ -172,6 +183,12 @@ const DiaryCard = styled.div`
   display: flex;
   flex-direction: column;
   overflow: visible;
+  box-sizing: border-box;
+
+  @media (max-width: 360px) {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
 `;
 
 /* ── 도트 인디케이터 ── */
