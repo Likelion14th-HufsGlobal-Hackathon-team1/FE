@@ -43,10 +43,11 @@ const HeaderBanner = styled.div`
     content: "";
     position: absolute;
     inset: 0;
-    /* 가로 2배 너비로 타일링하여 끊김 없이 스크롤 */
+    /* 가로 패턴 이미지를 반복해 끊김 없이 스크롤 */
     width: 200%;
     background: url(${headerBg}) repeat-x center;
     background-size: auto 100%;
+    opacity: 0.58;
     animation: ${scrollPattern} 20s linear infinite;
   }
 `;

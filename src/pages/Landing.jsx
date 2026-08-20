@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import charmBag from "../assets/charm-bag.svg";
-import mcmLogo from "../assets/mcm-logo.svg";
+import archivLogo from "../assets/archiv-logo.png";
 
 const Page = styled.main`
   display: flex;
@@ -25,13 +25,13 @@ const Page = styled.main`
 
 const BrandLogo = styled.img`
   display: block;
-  width: 86px;
-  height: 76px;
+  width: min(270px, 82vw);
+  height: auto;
   object-fit: contain;
 `;
 
 const Tagline = styled.p`
-  margin: 20px 0 0;
+  margin: 12px 0 0;
   color: #33251f;
   font: 400 clamp(16px, 4.5vw, 19px) / 1.3 var(--font-english);
 `;
@@ -40,7 +40,7 @@ const HeroVisual = styled.img`
   display: block;
   width: min(315px, 92vw);
   height: auto;
-  margin-top: clamp(70px, 11svh, 110px);
+  margin-top: clamp(58px, 9svh, 92px);
   margin-bottom: clamp(50px, 7svh, 76px);
 `;
 
@@ -74,7 +74,7 @@ function Landing() {
 
   return (
     <Page>
-      <BrandLogo src={mcmLogo} alt="MCM" />
+      <BrandLogo src={archivLogo} alt="ARCHIV" />
       <Tagline>Archive the journey,<br />preserve the story of your MCM.</Tagline>
       <HeroVisual src={charmBag} alt="참 장식이 달린 MCM 가방" />
       <StartButton type="button" onClick={() => navigate("/login")}>

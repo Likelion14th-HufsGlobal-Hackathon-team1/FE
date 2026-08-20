@@ -6,6 +6,7 @@ import styled from "styled-components";
 
 import PrimaryButton from "../components/Button";
 import { apiGet, apiPost } from "../utils/api";
+import { uploadImageToCloudinary } from "../utils/cloudinary";
 
 const COUNTRIES = [
   "대한민국",
@@ -232,35 +233,27 @@ const PhotoLabel = styled.span`
   font: 300 14px/1 var(--font-kopub);
 `;
 
-const PhotoUrlRow = styled.div`
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+const PhotoInput = styled.input`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 `;
 
-const PhotoUrlInput = styled.input`
-  width: 100%;
-  min-width: 0;
-  height: 40px;
-  border: 1px solid var(--color-soft-taupe);
-  border-radius: 8px;
+const PhotoAddButton = styled.label`
+  display: inline-flex;
+  min-width: 76px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 20px;
   padding: 0 12px;
   color: #090a0a;
-  background: transparent;
-  font: 300 12px/1.3 var(--font-kopub);
-  outline: none;
-
-  &::placeholder { color: #a89b89; }
-  &:focus { border-color: var(--color-walnut); }
-`;
-
-const PhotoUrlButton = styled.button`
-  height: 40px;
-  border: 0;
-  border-radius: 8px;
-  padding: 0 14px;
-  color: var(--color-cream);
-  background: var(--color-walnut);
+  background: var(--color-soft-taupe);
   font: 300 12px/1 var(--font-kopub);
   cursor: pointer;
 
@@ -364,6 +357,7 @@ const Dropdown = ({ ariaLabel, value, options, placeholder = "", onChange }) => 
 
 const JourneyTrip = () => {
   const navigate = useNavigate();
+  const photosRef = useRef([]);
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
   const [day, setDay] = useState("");
@@ -373,7 +367,6 @@ const JourneyTrip = () => {
   const [product, setProduct] = useState("");
   const [registeredProducts, setRegisteredProducts] = useState([]);
   const [photos, setPhotos] = useState([]);
-  const [photoUrlInput, setPhotoUrlInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -404,17 +397,28 @@ const JourneyTrip = () => {
     return Array.from({ length: count }, (_, index) => index + 1);
   }, [year, month]);
 
-  const handlePhotoUrlAdd = () => {
-    const url = photoUrlInput.trim();
-    if (!/^https?:\/\//i.test(url)) {
-      setSubmitError("http:// 또는 https://로 시작하는 이미지 URL을 입력해주세요.");
-      return;
-    }
+  useEffect(() => {
+    photosRef.current = photos;
+  }, [photos]);
+
+  useEffect(() => () => {
+    photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.src));
+  }, []);
+
+  const handlePhotoAdd = (event) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    if (selectedFiles.length === 0) return;
+
     setPhotos((current) => [
       ...current,
-      { name: `url-${current.length + 1}`, src: url },
+      ...selectedFiles.map((file) => ({
+        id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+        name: file.name,
+        file,
+        src: URL.createObjectURL(file),
+      })),
     ]);
-    setPhotoUrlInput("");
+    event.target.value = "";
     setSubmitError("");
   };
 
@@ -450,27 +454,32 @@ const JourneyTrip = () => {
 
     setIsSubmitting(true);
     try {
-      console.info("[Journey 4/7] POST /api/journeys 요청을 전송합니다.");
+      console.info(`[Journey 4/8] 선택한 여행 사진 ${photos.length}장을 Cloudinary에 업로드합니다.`);
+      const imageUrls = await Promise.all(
+        photos.map((photo) => uploadImageToCloudinary(photo.file)),
+      );
+      console.info(`[Journey 5/8] Cloudinary secure_url ${imageUrls.length}개를 확인했습니다.`);
+      console.info("[Journey 6/8] POST /api/journeys 요청을 전송합니다.");
       const journeyData = {
         productId: selectedProduct.apiId,
         country: selectedCountry,
         city: city.trim(),
         travelDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-        imageUrls: photos.map((photo) => photo.src),
+        imageUrls,
       };
       const { data, status } = await apiPost("/journeys", { ...journeyData, memo: "" });
 
-      console.info(`[Journey 5/7] 서버 응답을 받았습니다. HTTP ${status}`);
+      console.info(`[Journey 7/8] 서버 응답을 받았습니다. HTTP ${status}`);
 
       const candidates = Array.isArray(data.candidates)
         ? data.candidates.filter((candidate) => candidate?.candidateId != null && candidate?.imageUrl)
         : [];
       if (candidates.length === 0) throw new Error("생성된 Charm 후보가 없습니다.");
-      console.info(`[Journey 6/7] AI Charm 후보 ${candidates.length}개를 확인했습니다.`, {
+      console.info(`[Journey 8/8] AI Charm 후보 ${candidates.length}개를 확인했습니다.`, {
         candidateIds: candidates.map((candidate) => candidate.candidateId),
       });
 
-      console.info("[Journey 7/7] Charm 후보 선택 화면으로 이동합니다.");
+      console.info("[Journey 완료] Charm 후보 선택 화면으로 이동합니다.");
       navigate("/journey/make", { state: { candidates, journeyData } });
     } catch (error) {
       console.error("[Journey 오류] 여정 인증 또는 Charm 생성 요청에 실패했습니다.", error);
@@ -569,21 +578,18 @@ const JourneyTrip = () => {
         <Field>
           <PhotoHeading>
             <PhotoLabel>PHOTO</PhotoLabel>
-          </PhotoHeading>
-          <PhotoUrlRow>
-            <PhotoUrlInput
-              type="url"
-              inputMode="url"
-              aria-label="여행 사진 이미지 URL"
-              placeholder="https://.../photo.jpg"
-              value={photoUrlInput}
-              onChange={(event) => setPhotoUrlInput(event.target.value)}
+            <PhotoAddButton htmlFor="journey-photo-files">PHOTO +</PhotoAddButton>
+            <PhotoInput
+              id="journey-photo-files"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoAdd}
             />
-            <PhotoUrlButton type="button" onClick={handlePhotoUrlAdd}>추가</PhotoUrlButton>
-          </PhotoUrlRow>
+          </PhotoHeading>
           <PreviewList $hasPhotos={photos.length > 0} aria-live="polite">
             {photos.map((photo, index) => (
-              <Preview key={`${photo.name}-${index}`} src={photo.src} alt={`선택한 여행 사진 ${index + 1}`} />
+              <Preview key={photo.id} src={photo.src} alt={`선택한 여행 사진 ${index + 1}`} />
             ))}
           </PreviewList>
         </Field>

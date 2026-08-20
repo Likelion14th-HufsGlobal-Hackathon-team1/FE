@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { RiArrowDropDownLine } from "react-icons/ri";
-import { TbWand } from "react-icons/tb";
+import { CiImageOn } from "react-icons/ci";
+import { PiMagicWandLight } from "react-icons/pi";
+import { RiArrowDropDownLine, RiImageAddLine } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import PrimaryButton from "../components/Button";
 import { apiGet, apiPost } from "../utils/api";
+import { uploadImageToCloudinary } from "../utils/cloudinary";
 
 const Page = styled.main`
   display: flex;
-  width: min(100%, 480px);
+  width: min(100%, 402px);
   min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 65px clamp(20px, 7.7vw, 37px) 20px;
+  padding: 65px 31px 20px;
   flex-direction: column;
   color: #090a0a;
   background: var(--color-ivory-paper);
@@ -49,17 +51,6 @@ const Description = styled.p`
   padding-left: 11px;
   color: #090a0a;
   font: 300 12px/1.45 var(--font-kopub);
-`;
-
-const Preview = styled.img`
-  display: block;
-  margin: 32px auto 0;
-  width: auto;
-  max-width: min(100%, 320px);
-  height: auto;
-  max-height: min(38svh, 300px);
-  border-radius: 30px;
-  object-fit: contain;
 `;
 
 const ProductDropdown = styled.div`
@@ -117,31 +108,82 @@ const ProductDropdownOption = styled.button`
   &:hover, &:focus-visible { outline: none; background: ${({ $selected }) => ($selected ? "var(--color-walnut)" : "rgba(182, 168, 146, .28)")}; }
 `;
 
-const UrlField = styled.div`
+const PhotoField = styled.div`
   width: 100%;
-  margin-top: 18px;
+  margin-top: 28px;
 `;
 
-const UrlLabel = styled.label`
-  display: block;
-  margin-bottom: 8px;
-  color: #090a0a;
-  font: 300 12px/1 var(--font-kopub);
+const FileInput = styled.input`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 `;
 
-const UrlInput = styled.input`
-  width: 100%;
-  height: 42px;
-  border: 1px solid var(--color-soft-taupe);
-  border-radius: 8px;
-  padding: 0 12px;
-  color: #090a0a;
+const PhotoPicker = styled.label`
+  position: relative;
+  display: flex;
+  width: calc(100% - 9px);
+  height: 293px;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  border: 0;
+  border-radius: ${({ $hasFile }) => ($hasFile ? "30px" : "0")};
+  padding: ${({ $hasFile }) => ($hasFile ? "0" : "18px")};
+  overflow: hidden;
+  color: var(--color-soft-taupe);
   background: transparent;
-  font: 300 12px/1.3 var(--font-kopub);
-  outline: none;
+  font: 300 12px/1.5 var(--font-kopub);
+  text-align: center;
+  cursor: pointer;
 
-  &::placeholder { color: #a89b89; }
-  &:focus { border-color: var(--color-walnut); }
+  &::before {
+    position: absolute;
+    inset: 0;
+    display: ${({ $hasFile }) => ($hasFile ? "none" : "block")};
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='330' height='293' viewBox='0 0 330 293' preserveAspectRatio='none'%3E%3Crect x='1' y='1' width='328' height='291' fill='none' stroke='%235c4033' stroke-width='2' stroke-dasharray='14 14'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    content: "";
+    pointer-events: none;
+  }
+
+  svg { width: 40px; height: 40px; flex: 0 0 auto; }
+  &:focus-within { outline: 2px solid rgba(95, 65, 50, .16); outline-offset: 3px; }
+`;
+
+const Preview = styled.img`
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  object-fit: cover;
+`;
+
+const UploadButton = styled.label`
+  display: flex;
+  width: 100%;
+  min-height: 51px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 60px;
+  border-radius: 30px;
+  padding: 11px 20px;
+  background: var(--color-walnut);
+  color: #fff;
+  font: 300 18px/1 var(--font-kopub);
+  cursor: pointer;
+
+  svg { width: 25px; height: 25px; }
+  &:focus-within { outline: 2px solid var(--color-walnut); outline-offset: 3px; }
 `;
 
 const ErrorMessage = styled.p`
@@ -152,7 +194,7 @@ const ErrorMessage = styled.p`
 `;
 
 const ActionButton = styled(PrimaryButton)`
-  margin-top: clamp(48px, 10svh, 96px);
+  margin-top: 60px;
 
   @media (max-height: 720px) {
     margin-top: 40px;
@@ -162,7 +204,8 @@ const ActionButton = styled(PrimaryButton)`
 const CareUpload = () => {
   const navigate = useNavigate();
   const productDropdownRef = useRef(null);
-  const [publicImageUrl, setPublicImageUrl] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [products, setProducts] = useState([]);
   const [productId, setProductId] = useState("");
   const [isProductOpen, setIsProductOpen] = useState(false);
@@ -197,6 +240,17 @@ const CareUpload = () => {
   }, []);
 
   useEffect(() => {
+    if (!selectedImage) {
+      setPreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(selectedImage);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedImage]);
+
+  useEffect(() => {
     const closeDropdown = (event) => {
       if (!productDropdownRef.current?.contains(event.target)) setIsProductOpen(false);
     };
@@ -205,12 +259,10 @@ const CareUpload = () => {
   }, []);
 
   const selectedProduct = products.find((product) => String(product.id) === productId);
-  const publicPreviewUrl = /^https?:\/\//i.test(publicImageUrl.trim()) ? publicImageUrl.trim() : "";
 
   const handleAction = async () => {
-    const normalizedPublicUrl = publicImageUrl.trim();
-    if (!normalizedPublicUrl) {
-      setError("분석할 이미지 URL을 입력해주세요.");
+    if (!selectedImage) {
+      setError("분석할 가방 사진을 선택해주세요.");
       return;
     }
     if (!productId) {
@@ -221,18 +273,19 @@ const CareUpload = () => {
     setError("");
     setIsAnalyzing(true);
     try {
-      if (normalizedPublicUrl && !/^https?:\/\//i.test(normalizedPublicUrl)) {
-        throw new Error("http:// 또는 https://로 시작하는 공개 이미지 URL을 입력해주세요.");
-      }
-      console.info("[Care 3/6] 입력한 이미지 URL을 사용합니다.");
-      const imageUrl = normalizedPublicUrl;
-      console.info("[Care 4/6] AI 케어 분석을 요청합니다. POST /api/care/reports", { productId: Number(productId) });
+      console.info("[Care 3/7] 선택한 사진을 Cloudinary에 업로드합니다.", {
+        name: selectedImage.name,
+        size: selectedImage.size,
+      });
+      const imageUrl = await uploadImageToCloudinary(selectedImage);
+      console.info("[Care 4/7] Cloudinary secure_url을 확인했습니다.", { imageUrl });
+      console.info("[Care 5/7] AI 케어 분석을 요청합니다. POST /api/care/reports", { productId: Number(productId) });
       const { data, status } = await apiPost("/care/reports", {
         productId: Number(productId),
         imageUrl,
       });
-      console.info(`[Care 5/6] 분석 결과를 받았습니다. HTTP ${status}`, { careId: data.careId });
-      console.info("[Care 6/6] 분석 결과 화면으로 이동합니다.");
+      console.info(`[Care 6/7] 분석 결과를 받았습니다. HTTP ${status}`, { careId: data.careId });
+      console.info("[Care 7/7] 분석 결과 화면으로 이동합니다.");
       navigate(`/care/result?careId=${data.careId}`, { state: { analysis: data, photoUrl: imageUrl } });
     } catch (analyzeError) {
       console.error("[Care 오류] AI 케어 분석에 실패했습니다.", analyzeError);
@@ -245,7 +298,7 @@ const CareUpload = () => {
   return (
     <Page>
       <Intro>
-        <Title><TbWand aria-hidden="true" />가방 상태 분석</Title>
+        <Title><PiMagicWandLight aria-hidden="true" />가방 상태 분석</Title>
         <Description>
           오래도록 아름답게 간직할 수 있도록,<br />
           AI가 가방의 현재 상태를 분석하고<br />
@@ -269,32 +322,39 @@ const CareUpload = () => {
         )}
       </ProductDropdown>
 
-      <UrlField>
-        <UrlLabel htmlFor="care-public-image-url">이미지 URL</UrlLabel>
-        <UrlInput
-          id="care-public-image-url"
-          type="url"
-          inputMode="url"
-          placeholder="https://.../bag.jpg"
-          value={publicImageUrl}
-          onChange={(event) => {
-            setPublicImageUrl(event.target.value);
-            setError("");
-          }}
-        />
-      </UrlField>
+      <PhotoField>
+        <PhotoPicker htmlFor="care-image-file" $hasFile={Boolean(selectedImage)}>
+          {previewUrl ? (
+            <Preview src={previewUrl} alt="분석할 가방 미리보기" />
+          ) : (
+            <>
+              <RiImageAddLine aria-hidden="true" />
+              <span>분석하고 싶은 가방 사진을 업로드 해주세요.</span>
+            </>
+          )}
+          <FileInput
+            id="care-image-file"
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              setSelectedImage(event.target.files?.[0] ?? null);
+              setError("");
+            }}
+          />
+        </PhotoPicker>
+        {!selectedImage && (
+          <UploadButton htmlFor="care-image-file">
+            <CiImageOn aria-hidden="true" />
+            <span>사진 업로드</span>
+          </UploadButton>
+        )}
+      </PhotoField>
 
-      {publicPreviewUrl && (
-        <Preview
-          src={publicPreviewUrl}
-          alt="분석할 가방 미리보기"
-          onError={() => setError("입력한 이미지 URL을 불러올 수 없습니다.")}
-        />
+      {selectedImage && (
+        <ActionButton icon={<PiMagicWandLight />} disabled={isAnalyzing} onClick={handleAction}>
+          {isAnalyzing ? "사진 업로드 및 분석 중..." : "분석 결과 확인"}
+        </ActionButton>
       )}
-
-      <ActionButton icon={<TbWand />} disabled={isAnalyzing} onClick={handleAction}>
-        {isAnalyzing ? "AI 분석 중..." : "분석 결과 확인"}
-      </ActionButton>
       {error && <ErrorMessage role="alert">{error}</ErrorMessage>}
     </Page>
   );
