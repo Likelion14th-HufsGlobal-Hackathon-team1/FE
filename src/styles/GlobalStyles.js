@@ -25,11 +25,92 @@ const GlobalStyles = createGlobalStyle`
     box-sizing: border-box;
   }
 
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
   body {
     margin: 0;
     font-family: var(--font-kopub);
     color: var(--color-walnut);
     background: var(--color-ivory-paper);
+  }
+
+  main,
+  header,
+  footer,
+  section,
+  article,
+  nav,
+  form,
+  fieldset,
+  div,
+  label {
+    min-width: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  strong,
+  small,
+  label,
+  button,
+  a,
+  li,
+  dd,
+  dt {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    min-width: 0;
+    max-width: 100%;
+    font-family: inherit;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  @media (max-width: 380px) {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    span,
+    strong,
+    small,
+    label,
+    button,
+    a,
+    li,
+    dd,
+    dt {
+      white-space: normal !important;
+    }
   }
 
   /* 영문 20 */
