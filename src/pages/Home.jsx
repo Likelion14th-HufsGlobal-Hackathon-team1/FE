@@ -6,6 +6,7 @@ import styled from "styled-components";
 
 import charmBagBase from "../assets/bag1.png";
 import mcmLogo from "../assets/mcm-logo.svg";
+import CharmKeyring from "../components/CharmKeyring";
 import { apiGet, apiPatch } from "../utils/api";
 
 const CHARM_LAYOUT_STORAGE_KEY = "onepick-charm-layout";
@@ -114,14 +115,12 @@ const Pagination = styled.div`
 `;
 
 const PaginationDot = styled.span`
-  width: ${({ $active }) => ($active ? "18px" : "6px")};
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   background: ${({ $active }) =>
-    $active ? "var(--color-walnut)" : "var(--color-soft-taupe)"};
-  transition:
-    width 240ms ease,
-    background-color 240ms ease;
+    $active ? "var(--color-walnut)" : "rgba(182, 168, 146, 0.42)"};
+  transition: background-color 240ms ease;
 `;
 
 const CardInner = styled.span`
@@ -149,35 +148,102 @@ const CardFace = styled.span`
 `;
 
 const CardFront = styled(CardFace)`
+  position: absolute;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  background:
+    radial-gradient(ellipse at 76% 12%, rgba(255, 247, 235, 0.28) 0%, transparent 31%),
+    radial-gradient(ellipse at 13% 92%, rgba(255, 244, 226, 0.32) 0%, transparent 36%),
+    linear-gradient(135deg, #8b725e 0%, #a78d76 42%, #c4ad96 68%, #907661 100%);
+  box-shadow: inset 0 0 34px rgba(72, 48, 35, 0.14);
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -35%;
+    pointer-events: none;
+  }
+
+  &::before {
+    background: linear-gradient(116deg, transparent 32%, rgba(255, 248, 238, 0.2) 47%, transparent 61%);
+    transform: rotate(-6deg);
+    filter: blur(8px);
+  }
+
+  &::after {
+    background: linear-gradient(25deg, rgba(62, 42, 31, 0.18), transparent 44%);
+    filter: blur(12px);
+  }
 `;
 
 const Logo = styled.img`
-  width: 82px;
-  height: 82px;
+  position: relative;
+  z-index: 1;
+  width: 94px;
+  height: 94px;
   object-fit: contain;
+  filter: brightness(0) invert(1);
+`;
+
+const CardTagline = styled.span`
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 3px;
+  white-space: nowrap;
 `;
 
 const CardBack = styled(CardFace)`
+  position: absolute;
   flex-direction: column;
   align-items: center;
-  gap: 13px;
-  padding: 11px 14px;
+  justify-content: center;
+  gap: 11px;
+  padding: 14px 18px;
   transform: rotateY(180deg);
   font-family: var(--font-english);
   text-align: center;
+  color: rgba(255, 255, 255, 0.94);
+  background:
+    radial-gradient(ellipse at 76% 12%, rgba(255, 247, 235, 0.28) 0%, transparent 31%),
+    radial-gradient(ellipse at 13% 92%, rgba(255, 244, 226, 0.32) 0%, transparent 36%),
+    linear-gradient(135deg, #8b725e 0%, #a78d76 42%, #c4ad96 68%, #907661 100%);
+  box-shadow: inset 0 0 34px rgba(72, 48, 35, 0.14);
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -35%;
+    background: linear-gradient(116deg, transparent 32%, rgba(255, 248, 238, 0.2) 47%, transparent 61%);
+    transform: rotate(-6deg);
+    filter: blur(8px);
+    pointer-events: none;
+  }
+
+  & > span {
+    position: relative;
+    z-index: 1;
+  }
 `;
 
 const Brand = styled.span`
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 8px rgba(64, 42, 31, 0.2);
 `;
 
 const Certificate = styled.span`
-  font-size: clamp(14px, 4.2vw, 17px);
+  font-size: clamp(12px, 3.7vw, 15px);
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.08em;
   white-space: nowrap;
 `;
 
@@ -187,8 +253,12 @@ const ProductDetails = styled.span`
   column-gap: 12px;
   width: max-content;
   max-width: 100%;
-  font-size: clamp(14px, 4.2vw, 17px);
-  line-height: 1.15;
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(76, 50, 37, 0.12);
+  font-size: clamp(12px, 3.7vw, 15px);
+  line-height: 1.25;
   text-align: left;
 
   & > span {
@@ -311,16 +381,20 @@ const HomeBagImage = styled.img`
   object-fit: contain;
 `;
 
-const HomePlacedCharm = styled.img`
+const HomePlacedCharm = styled.span`
   position: absolute;
   z-index: 2;
   top: ${({ $y }) => $y}%;
   left: ${({ $x }) => $x}%;
   width: ${({ $size }) => ($size / 330) * 100}%;
   aspect-ratio: 1;
-  object-fit: contain;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.16));
   transform: translate(-50%, -50%) rotate(${({ $rotation }) => $rotation}deg);
+
+  > span {
+    width: 100%;
+    height: 100%;
+  }
 `;
 
 const ModalLayer = styled.div`
@@ -469,6 +543,7 @@ const Home = () => {
     }
   });
   const [careHistory, setCareHistory] = useState([]);
+  const [careHistoryLoaded, setCareHistoryLoaded] = useState(false);
   const [careNotifications, setCareNotifications] = useState([]);
   const [activeNotification, setActiveNotification] = useState(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -494,15 +569,26 @@ const Home = () => {
         if (!active) return;
         setHomeCharms(charms.filter((charm) => charm?.charmId != null && charm?.aiImageUrl).map((charm, index) => {
           const key = `${charm.charmId}-${index}`;
+          const hasServerPosition = Number.isFinite(charm.positionX)
+            && Number.isFinite(charm.positionY)
+            && Number.isFinite(charm.scale)
+            && charm.scale > 0;
           return {
             key,
             imageUrl: charm.aiImageUrl,
-            layout: savedLayout[key] ?? {
-              x: 28 + (index % 4) * 15,
-              y: 43 + (index % 2) * 19,
-              rotation: index % 2 === 0 ? -6 : 6,
-              size: 54,
-            },
+            layout: hasServerPosition
+              ? {
+                  x: charm.positionX * 100,
+                  y: charm.positionY * 100,
+                  rotation: Number.isFinite(charm.rotation) ? charm.rotation : 0,
+                  size: charm.scale * 330,
+                }
+              : savedLayout[key] ?? {
+                  x: 28 + (index % 4) * 15,
+                  y: 43 + (index % 2) * 19,
+                  rotation: index % 2 === 0 ? -6 : 6,
+                  size: 54,
+                },
           };
         }));
         console.info(`[Home Charm] 생성 Charm ${charms.length}개를 가방에 반영했습니다.`);
@@ -540,6 +626,7 @@ const Home = () => {
 
   useEffect(() => {
     let active = true;
+    setCareHistoryLoaded(false);
     const loadCareHistory = async () => {
       try {
         console.info("[Home Care] 케어 이력을 조회합니다. GET /api/care/reports");
@@ -570,6 +657,8 @@ const Home = () => {
         console.info(`[Home Care] 케어 이력 ${reports.length}건을 확인했습니다.`);
       } catch (historyError) {
         console.error("[Home Care 오류] 케어 이력 조회에 실패했습니다.", historyError);
+      } finally {
+        if (active) setCareHistoryLoaded(true);
       }
     };
     loadCareHistory();
@@ -577,6 +666,14 @@ const Home = () => {
   }, [reservation]);
 
   useEffect(() => {
+    if (!careHistoryLoaded) return;
+    if (careHistory.length === 0) {
+      setCareNotifications([]);
+      setActiveNotification(null);
+      setShowCareReminder(false);
+      return;
+    }
+
     let active = true;
     const loadNotifications = async () => {
       try {
@@ -597,7 +694,7 @@ const Home = () => {
     };
     loadNotifications();
     return () => { active = false; };
-  }, [careAlert, reservation]);
+  }, [careAlert, careHistory, careHistoryLoaded, reservation]);
 
   const handleCareAlertToggle = () => {
     setCareAlert((current) => {
@@ -610,7 +707,9 @@ const Home = () => {
       if (!next) {
         setShowCareReminder(false);
       } else {
-        const unread = careNotifications.find((notification) => !notification.isRead);
+        const unread = careHistory.length > 0
+          ? careNotifications.find((notification) => !notification.isRead)
+          : null;
         setActiveNotification(unread ?? null);
         setShowCareReminder(Boolean(unread));
       }
@@ -758,6 +857,7 @@ const Home = () => {
                 <CardInner $flipped={isFlipped}>
                   <CardFront>
                     <Logo src={mcmLogo} alt="MCM" draggable="false" />
+                    <CardTagline>ARCHIVE YOUR JOURNEY</CardTagline>
                   </CardFront>
                   <CardBack>
                     <Brand>MCM</Brand>
@@ -834,13 +934,16 @@ const Home = () => {
             {homeCharms.map((charm, index) => (
               <HomePlacedCharm
                 key={charm.key}
-                src={charm.imageUrl}
-                alt={`생성한 Charm ${index + 1}`}
                 $x={charm.layout.x}
                 $y={charm.layout.y}
                 $size={charm.layout.size}
                 $rotation={charm.layout.rotation}
-              />
+              >
+                <CharmKeyring
+                  src={charm.imageUrl}
+                  alt={`생성한 Charm ${index + 1}`}
+                />
+              </HomePlacedCharm>
             ))}
           </HomeCharmStage>
         </CharmSection>

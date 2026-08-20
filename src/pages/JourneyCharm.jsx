@@ -5,15 +5,16 @@ import styled from "styled-components";
 
 import bagImage from "../assets/bag1.png";
 import PrimaryButton from "../components/Button";
+import CharmKeyring from "../components/CharmKeyring";
 import { apiGet } from "../utils/api";
 
-const CHARM_POSITIONS = [
-  { top: "38%", left: "34%", rotate: "-8deg" },
-  { top: "40%", left: "50%", rotate: "5deg" },
-  { top: "37%", left: "66%", rotate: "-3deg" },
-  { top: "54%", left: "41%", rotate: "7deg" },
-  { top: "53%", left: "59%", rotate: "-6deg" },
-  { top: "58%", left: "74%", rotate: "8deg" },
+const DEFAULT_CHARM_LAYOUTS = [
+  { x: 34, y: 38, rotation: -8, scale: 0.16 },
+  { x: 50, y: 40, rotation: 5, scale: 0.16 },
+  { x: 66, y: 37, rotation: -3, scale: 0.16 },
+  { x: 41, y: 54, rotation: 7, scale: 0.16 },
+  { x: 59, y: 53, rotation: -6, scale: 0.16 },
+  { x: 74, y: 58, rotation: 8, scale: 0.16 },
 ];
 
 const Page = styled.main`
@@ -21,7 +22,7 @@ const Page = styled.main`
   width: min(100%, 480px);
   min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 66px clamp(20px, 7.7vw, 37px) 99px;
+  padding: 66px clamp(20px, 7.7vw, 37px) 20px;
   flex-direction: column;
   color: #090a0a;
   background: var(--color-ivory-paper);
@@ -133,18 +134,18 @@ const BagImage = styled.img`
 const AddedCharm = styled.button`
   position: absolute;
   z-index: 1;
-  top: ${({ $position }) => $position.top};
-  left: ${({ $position }) => $position.left};
-  width: clamp(35px, 16%, 50px);
-  height: 27%;
+  top: ${({ $layout }) => $layout.y}%;
+  left: ${({ $layout }) => $layout.x}%;
+  width: ${({ $layout }) => $layout.scale * 100}%;
+  aspect-ratio: 1;
   border: 0;
   padding: 0;
   background: transparent;
   cursor: pointer;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.14));
-  transform: translate(-50%, -50%) rotate(${({ $position }) => $position.rotate});
+  transform: translate(-50%, -50%) rotate(${({ $layout }) => $layout.rotation}deg);
 
-  img {
+  > span {
     display: block;
     width: 100%;
     height: 100%;
@@ -226,18 +227,29 @@ const JourneyCharm = () => {
         <BagImage src={bagImage} alt="MCM 가방" />
         {charms.map((charm, index) => {
           if (!charm?.aiImageUrl) return null;
-          const position = CHARM_POSITIONS[index % CHARM_POSITIONS.length];
+          const hasServerPosition = Number.isFinite(charm.positionX)
+            && Number.isFinite(charm.positionY)
+            && Number.isFinite(charm.scale)
+            && charm.scale > 0;
+          const layout = hasServerPosition
+            ? {
+                x: charm.positionX * 100,
+                y: charm.positionY * 100,
+                rotation: Number.isFinite(charm.rotation) ? charm.rotation : 0,
+                scale: charm.scale,
+              }
+            : DEFAULT_CHARM_LAYOUTS[index % DEFAULT_CHARM_LAYOUTS.length];
           return (
             <AddedCharm
               key={charm.charmId}
               type="button"
               aria-label={`생성한 Charm ${index + 1} 상세 보기`}
-              $position={position}
+              $layout={layout}
               onClick={() =>
                 navigate(`/journey/detail?charmId=${charm.charmId}`)
               }
             >
-              <img src={charm.aiImageUrl} alt="" />
+              <CharmKeyring src={charm.aiImageUrl} />
             </AddedCharm>
           );
         })}

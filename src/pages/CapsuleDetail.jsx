@@ -1,33 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 
-import example1 from "../assets/example1.png";
-import example2 from "../assets/example2.png";
-import charm1 from "../assets/generated-charm-1.svg";
-import charm2 from "../assets/generated-charm-2.png";
-import charm3 from "../assets/generated-charm-3.png";
+import { apiGet } from "../utils/api";
 
-/* ───────────────────── 더미 데이터 ───────────────────── */
-const DUMMY_LETTER = {
-  title: "To my future self",
-  date: "2026.8.12",
-  body: "첫 월급 타고 큰맘 먹고 나에게 준 선물! 10년 뒤 메시지를 열어볼 때쯤엔 내가 원하던 멋진 직업을 가진 사람이 되어 있기를 바랄게.",
-  from: "2026년의 나로부터",
+const formatDate = (date) => {
+  if (!date) return "-";
+  return new Date(`${date}T00:00:00`)
+    .toLocaleDateString("ko-KR")
+    .replace(/\. /g, ".")
+    .replace(/\.$/, "");
 };
-
-const DUMMY_CHARMS = [
-  { id: 1, image: charm1, date: "2028.8.15", country: "FRANCE", city: "PARIS" },
-  { id: 2, image: charm2, date: "2028.8.15", country: "FRANCE", city: "PARIS" },
-  { id: 3, image: charm3, date: "2028.8.15", country: "FRANCE", city: "PARIS" },
-];
-
-const getRandomPhotos = (photoArray, count) => {
-  const shuffled = [...photoArray].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
-};
-
-const PHOTO_POOL = [example1, example2];
 
 /* ───────────────────── 애니메이션 ───────────────────── */
 const fadeInUp = keyframes`
@@ -335,31 +318,69 @@ const CharmScrollArea = styled.div`
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 20px;
+  padding-right: 2px;
 `;
 
 const CharmItem = styled.div`
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 0;
+  min-height: 500px;
+  flex: 0 0 500px;
+  flex-direction: column;
+  padding: 30px 0 24px;
 
   &:not(:last-child) {
     border-bottom: 1px solid rgba(182, 168, 146, 0.3);
   }
 `;
 
+const CharmTop = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+`;
+
+const CharmImageButton = styled.button`
+  width: 88px;
+  height: 88px;
+  flex: 0 0 88px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-walnut);
+    outline-offset: 3px;
+  }
+`;
+
 const CharmImage = styled.img`
-  width: 75px;
-  height: 75px;
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  flex-shrink: 0;
 `;
 
 const CharmInfo = styled.div`
   display: flex;
+  width: 100%;
   flex-direction: column;
   gap: 0;
   flex: 1;
+`;
+
+const CharmJourneyCollage = styled(PhotoCollage)`
+  height: 285px;
+  margin: 62px 0 0;
+`;
+
+const EmptyJourneyPhotos = styled.p`
+  margin: 80px 0 0;
+  color: var(--color-soft-taupe);
+  font: 300 13px/1.5 var(--font-kopub);
+  text-align: center;
 `;
 
 const CharmRow = styled.div`
@@ -391,29 +412,6 @@ const CharmValue = styled.span`
   color: var(--color-walnut);
 `;
 
-const CharmArrow = styled.button`
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--color-walnut);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: opacity 200ms ease;
-
-  &:hover {
-    opacity: 0.85;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-walnut);
-    outline-offset: 3px;
-  }
-`;
-
 /* ───────────────────── 아이콘 ───────────────────── */
 const ArrowLeftIcon = () => (
   <svg
@@ -432,26 +430,14 @@ const ArrowLeftIcon = () => (
   </svg>
 );
 
-const ArrowRightIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="var(--color-cream)"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <line x1="5" y1="12" x2="19" y2="12" />
-    <polyline points="12 5 19 12 12 19" />
-  </svg>
-);
-
 /* ───────────────────── 컴포넌트 ───────────────────── */
 const CapsuleDetail = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const productId = location.state?.productId;
+  const [product, setProduct] = useState(null);
+  const [charms, setCharms] = useState([]);
+  const [loadError, setLoadError] = useState("");
   const [showIntro, setShowIntro] = useState(() => {
     // open 버튼으로 처음 진입할 때만 인트로 표시 (이후 재방문 시 스킵)
     if (sessionStorage.getItem("capsule_intro_shown")) {
@@ -463,20 +449,63 @@ const CapsuleDetail = () => {
   const [activeTab, setActiveTab] = useState("letter");
 
   useEffect(() => {
+    if (!productId) {
+      setLoadError("제품 정보가 없습니다. 컬렉션에서 제품을 다시 선택해주세요.");
+      return;
+    }
+
+    let active = true;
+    const loadCapsule = async () => {
+      try {
+        console.info(`[Capsule 1/2] 제품 상세를 조회합니다. GET /api/products/${productId}`);
+        const [{ data: productData }, { data: charmData }] = await Promise.all([
+          apiGet(`/products/${productId}`),
+          apiGet("/charms"),
+        ]);
+        const allCharms = Array.isArray(charmData?.charms) ? charmData.charms : [];
+        const charmDetails = await Promise.allSettled(
+          allCharms.map(async (charm) => {
+            const { data: detail } = await apiGet(`/charms/${charm.charmId}`);
+            return detail;
+          }),
+        );
+        if (!active) return;
+        setProduct(productData);
+        setCharms(charmDetails
+          .filter((result) => result.status === "fulfilled")
+          .map((result) => result.value)
+          .filter((charm) => String(charm.product?.productId ?? charm.productId) === String(productId)));
+        console.info("[Capsule 2/2] 기억의 캡슐과 Charm을 불러왔습니다.");
+      } catch (error) {
+        if (active) setLoadError(error.message || "기억의 캡슐을 불러오지 못했습니다.");
+        console.error("[Capsule 오류] 기억의 캡슐 조회에 실패했습니다.", error);
+      }
+    };
+    loadCapsule();
+    return () => { active = false; };
+  }, [productId]);
+
+  useEffect(() => {
     if (!showIntro) return;
     const timer = setTimeout(() => setShowIntro(false), 2300);
     return () => clearTimeout(timer);
   }, [showIntro]);
 
   const photos = useMemo(() => {
-    const selected = getRandomPhotos(PHOTO_POOL, 2);
-    return selected.map((src) => ({
+    const journeyImages = charms
+      .flatMap((charm) => Array.isArray(charm.images) ? charm.images : [])
+      .filter(Boolean)
+      .slice(0, 2);
+    const selected = journeyImages.length > 0
+      ? journeyImages
+      : product?.productImage
+        ? [product.productImage]
+        : [];
+    return selected.map((src, index) => ({
       src,
-      rotation: Math.random() * 8 - 3,
+      rotation: index % 2 === 0 ? -5 : 3,
     }));
-  }, []);
-
-  const bodyLines = null; // 더 이상 줄 분할 불필요
+  }, [charms, product?.productImage]);
 
   return (
     <PageWrapper>
@@ -531,49 +560,66 @@ const CapsuleDetail = () => {
               {/* 줄노트 편지 */}
               <LetterLines>
                 <LetterLine>
-                  <LetterTitle>{DUMMY_LETTER.title}</LetterTitle>
+                  <LetterTitle>{product?.nickname || product?.productName || "To my future self"}</LetterTitle>
                 </LetterLine>
                 <LetterLine>
-                  <LetterDate>{DUMMY_LETTER.date}</LetterDate>
+                  <LetterDate>{formatDate(product?.purchaseDate)}</LetterDate>
                 </LetterLine>
-                <LetterBody>{DUMMY_LETTER.body}</LetterBody>
+                <LetterBody>{loadError || product?.memoryCapsule || "기록된 기억이 없습니다."}</LetterBody>
                 <EmptyLine />
                 <LetterLineRight>
-                  <LetterFrom>{DUMMY_LETTER.from}</LetterFrom>
+                  <LetterFrom>{product?.nickname ? `${product.nickname}의 기록` : "나로부터"}</LetterFrom>
                 </LetterLineRight>
               </LetterLines>
             </>
           ) : (
             /* Charm 리스트 */
             <CharmScrollArea>
-              {DUMMY_CHARMS.map((charm) => (
-                <CharmItem key={charm.id}>
-                  <CharmImage src={charm.image} alt="참" />
-                  <CharmInfo>
-                    <CharmRow>
-                      <CharmLabel>DATE</CharmLabel>
-                      <CharmValue>{charm.date}</CharmValue>
-                    </CharmRow>
-                    <CharmRow>
-                      <CharmLabel>COUNTRY</CharmLabel>
-                      <CharmValue>{charm.country}</CharmValue>
-                    </CharmRow>
-                    <CharmRow>
-                      <CharmLabel>CITY</CharmLabel>
-                      <CharmValue>{charm.city}</CharmValue>
-                    </CharmRow>
-                  </CharmInfo>
-                  <CharmArrow
-                    type="button"
-                    onClick={() =>
-                      navigate("/charm-detail", { state: { charm } })
-                    }
-                    aria-label="참 상세 보기"
-                  >
-                    <ArrowRightIcon />
-                  </CharmArrow>
+              {charms.map((charm) => (
+                <CharmItem key={charm.charmId}>
+                  <CharmTop>
+                    <CharmImageButton
+                      type="button"
+                      onClick={() =>
+                        navigate("/charm-detail", { state: { charm } })
+                      }
+                      aria-label="참 상세 보기"
+                    >
+                      <CharmImage src={charm.aiImageUrl} alt="AI가 생성한 Charm" />
+                    </CharmImageButton>
+                    <CharmInfo>
+                      <CharmRow>
+                        <CharmLabel>DATE</CharmLabel>
+                        <CharmValue>{formatDate(charm.travelDate)}</CharmValue>
+                      </CharmRow>
+                      <CharmRow>
+                        <CharmLabel>COUNTRY</CharmLabel>
+                        <CharmValue>{charm.country || "-"}</CharmValue>
+                      </CharmRow>
+                      <CharmRow>
+                        <CharmLabel>CITY</CharmLabel>
+                        <CharmValue>{charm.city || "-"}</CharmValue>
+                      </CharmRow>
+                    </CharmInfo>
+                  </CharmTop>
+                  {Array.isArray(charm.images) && charm.images.some(Boolean) ? (
+                    <CharmJourneyCollage>
+                      {charm.images.filter(Boolean).slice(0, 2).map((image, index) => (
+                        <PolaroidFrame
+                          key={`${charm.charmId}-${image}`}
+                          $rotation={index % 2 === 0 ? -5 : 4}
+                        >
+                          <TapeDecor />
+                          <PolaroidImg src={image} alt={`Journey 사진 ${index + 1}`} />
+                        </PolaroidFrame>
+                      ))}
+                    </CharmJourneyCollage>
+                  ) : (
+                    <EmptyJourneyPhotos>등록된 Journey 사진이 없습니다.</EmptyJourneyPhotos>
+                  )}
                 </CharmItem>
               ))}
+              {!loadError && charms.length === 0 && <LetterBody>생성된 Charm이 없습니다.</LetterBody>}
             </CharmScrollArea>
           )}
         </DiaryCard>

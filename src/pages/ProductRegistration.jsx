@@ -472,6 +472,7 @@ const ProductRegistration = () => {
     purchaseYear: "",
     purchaseMonth: "",
     purchaseDay: "",
+    productImage: "",
     nickname: "",
     startDate: "",
     memory: "",
@@ -495,6 +496,7 @@ const ProductRegistration = () => {
         ...prev,
         productCode: data.productCode ?? prev.productCode,
         productName: data.productName ?? prev.productName,
+        productImage: data.productImage ?? prev.productImage,
         purchaseYear: data.purchaseDate?.slice(0, 4) ?? prev.purchaseYear,
         purchaseMonth: data.purchaseDate ? String(Number(data.purchaseDate.slice(5, 7))) : prev.purchaseMonth,
         purchaseDay: data.purchaseDate ? String(Number(data.purchaseDate.slice(8, 10))) : prev.purchaseDay,
@@ -575,11 +577,17 @@ const ProductRegistration = () => {
       console.info("[Product 2/3] 제품을 등록합니다. POST /api/products", {
         productCode: form.productCode.trim(),
         productName: form.productName.trim(),
+        productImage: form.productImage.trim(),
+        nickname: form.nickname.trim(),
+        memoryCapsule: form.memory.trim(),
         purchaseDate,
       });
       const { data } = await apiPost("/products", {
         productCode: form.productCode.trim(),
         productName: form.productName.trim(),
+        productImage: form.productImage.trim(),
+        nickname: form.nickname.trim(),
+        memoryCapsule: form.memory.trim(),
         purchaseDate,
       });
       console.info("[Product 2/3] 제품 등록을 완료했습니다.", data);

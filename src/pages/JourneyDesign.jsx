@@ -10,7 +10,8 @@ import styled from "styled-components";
 
 import bagImage from "../assets/bag1.png";
 import PrimaryButton from "../components/Button";
-import { apiGet } from "../utils/api";
+import CharmKeyring from "../components/CharmKeyring";
+import { apiGet, apiPatch } from "../utils/api";
 
 const CHARM_LAYOUT_STORAGE_KEY = "onepick-charm-layout";
 
@@ -26,12 +27,23 @@ const createInitialLayout = (charms) => {
 
   return charms.reduce((layout, charm, index) => {
     const key = charm.instanceId ?? `${charm.id}-${index}`;
-    layout[key] = savedLayout[key] ?? {
-      x: 28 + (index % 4) * 15,
-      y: 43 + (index % 2) * 19,
-      rotation: index % 2 === 0 ? -6 : 6,
-      size: 54,
-    };
+    const hasServerPosition = Number.isFinite(charm.positionX)
+      && Number.isFinite(charm.positionY)
+      && Number.isFinite(charm.scale)
+      && charm.scale > 0;
+    layout[key] = hasServerPosition
+      ? {
+          x: charm.positionX * 100,
+          y: charm.positionY * 100,
+          rotation: Number.isFinite(charm.rotation) ? charm.rotation : 0,
+          size: charm.scale * 330,
+        }
+      : savedLayout[key] ?? {
+          x: 28 + (index % 4) * 15,
+          y: 43 + (index % 2) * 19,
+          rotation: index % 2 === 0 ? -6 : 6,
+          size: 54,
+        };
     return layout;
   }, {});
 };
@@ -41,7 +53,7 @@ const Page = styled.main`
   width: min(100%, 480px);
   min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 18px clamp(20px, 7.7vw, 37px) 82px;
+  padding: 18px clamp(20px, 7.7vw, 37px) 20px;
   flex-direction: column;
   color: #090a0a;
   background: var(--color-ivory-paper);
@@ -149,7 +161,7 @@ const PlacedCharm = styled.button`
     cursor: grabbing;
   }
 
-  img {
+  > span {
     position: absolute;
     inset: 4px;
     display: block;
@@ -200,7 +212,7 @@ const CharmThumbnail = styled.button`
     $selected ? "rgba(182, 168, 146, 0.25)" : "transparent"};
   cursor: pointer;
 
-  img {
+  > span {
     position: absolute;
     inset: 5px;
     display: block;
@@ -242,7 +254,14 @@ const Control = styled.label`
 `;
 
 const SaveButton = styled(PrimaryButton)`
-  margin-top: 18px;
+  margin-top: auto;
+`;
+
+const SaveError = styled.p`
+  margin: 10px 0 0;
+  color: #b42318;
+  font: 300 12px/1.4 var(--font-kopub);
+  text-align: center;
 `;
 
 const JourneyDesign = () => {
@@ -251,6 +270,8 @@ const JourneyDesign = () => {
   const [charms, setCharms] = useState([]);
   const [layout, setLayout] = useState({});
   const [selectedKey, setSelectedKey] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -308,9 +329,31 @@ const JourneyDesign = () => {
     }));
   };
 
-  const handleSave = () => {
-    localStorage.setItem(CHARM_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
-    navigate("/journey/charm", { state: { createdCharms: charms } });
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveError("");
+    try {
+      console.info(`[Charm 배치 1/2] Charm ${charms.length}개의 위치 저장을 시작합니다.`);
+      await Promise.all(charms.map((charm, index) => {
+        const key = getCharmKey(charm, index);
+        const itemLayout = layout[key];
+        if (!itemLayout) return Promise.resolve();
+        return apiPatch(`/charms/${charm.id}/position`, {
+          positionX: itemLayout.x / 100,
+          positionY: itemLayout.y / 100,
+          rotation: itemLayout.rotation,
+          scale: itemLayout.size / 330,
+        });
+      }));
+      localStorage.setItem(CHARM_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+      console.info("[Charm 배치 2/2] 모든 Charm 위치를 서버에 저장했습니다.");
+      navigate("/journey/charm", { state: { createdCharms: charms } });
+    } catch (error) {
+      console.error("[Charm 배치 오류] Charm 위치 저장에 실패했습니다.", error);
+      setSaveError(error.message || "Charm 위치를 저장하지 못했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const selectedLayout = layout[selectedKey];
@@ -357,7 +400,7 @@ const JourneyDesign = () => {
                   onPointerDown={(event) => handlePointerDown(event, key)}
                   onPointerMove={(event) => handlePointerMove(event, key)}
                 >
-                  <img src={charm.imageUrl} alt="" draggable="false" />
+                  <CharmKeyring src={charm.imageUrl} />
                 </PlacedCharm>
               );
             })}
@@ -374,7 +417,7 @@ const JourneyDesign = () => {
                   aria-label={`Charm ${index + 1} 선택`}
                   onClick={() => setSelectedKey(key)}
                 >
-                  <img src={charm.imageUrl} alt="" />
+                  <CharmKeyring src={charm.imageUrl} />
                 </CharmThumbnail>
               );
             })}
@@ -414,11 +457,12 @@ const JourneyDesign = () => {
       </Controls>
 
       <SaveButton
-        disabled={charms.length === 0}
+        disabled={charms.length === 0 || isSaving}
         onClick={handleSave}
       >
-        저장
+        {isSaving ? "저장 중..." : "저장"}
       </SaveButton>
+      {saveError && <SaveError role="alert">{saveError}</SaveError>}
     </Page>
   );
 };

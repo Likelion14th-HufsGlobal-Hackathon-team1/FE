@@ -28,10 +28,12 @@ const YEARS = Array.from({ length: 11 }, (_, index) => CURRENT_YEAR - 9 + index)
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 
 const Page = styled.main`
+  display: flex;
   width: min(100%, 480px);
   min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 18px clamp(20px, 7.7vw, 37px) 84px;
+  padding: 18px clamp(20px, 7.7vw, 37px) 20px;
+  flex-direction: column;
   color: #090a0a;
   background: var(--color-ivory-paper);
   text-align: left;
@@ -109,6 +111,7 @@ const Description = styled.p`
 
 const Form = styled.form`
   display: flex;
+  flex: 1;
   margin-top: 28px;
   flex-direction: column;
   gap: 20px;
@@ -279,7 +282,7 @@ const Preview = styled.img`
 `;
 
 const SubmitButton = styled(PrimaryButton)`
-  margin-top: 15px;
+  margin-top: auto;
 `;
 
 const SubmitError = styled.p`

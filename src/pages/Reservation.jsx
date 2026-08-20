@@ -10,7 +10,7 @@ const SEOUL_LOCATION = { lat: 37.5665, lng: 126.978 };
 const formatApiDate = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
 
 const Page = styled.main`
-  width: min(100%, 480px); min-height: 100svh; margin: 0 auto; padding: 28px 36px 34px;
+  display: flex; width: min(100%, 480px); min-height: calc(100svh - 105px - env(safe-area-inset-bottom)); margin: 0 auto; padding: 28px 36px 20px; flex-direction: column;
   color: #33251f; background: var(--color-ivory-paper); text-align: left;
   @media (max-width: 380px) { padding-inline: 24px; }
 `;
@@ -95,7 +95,7 @@ const OptionButton = styled.button`
   &:hover, &:focus-visible { color: ${({ $selected }) => ($selected ? "#fffaf2" : "#33251f")}; background: ${({ $selected }) => ($selected ? "var(--color-walnut)" : "rgba(182,168,146,.28)")}; outline: none; }
 `;
 const SubmitButton = styled.button`
-  display: flex; width: 100%; height: 54px; margin-top: 38px; align-items: center; justify-content: center; gap: 10px;
+  display: flex; width: 100%; height: 54px; margin-top: auto; align-items: center; justify-content: center; gap: 10px;
   border: 0; border-radius: 28px; color: #fffaf2; background: var(--color-walnut); font: 400 17px var(--font-kopub); cursor: pointer;
   &:disabled { opacity: .45; cursor: not-allowed; }
 `;

@@ -7,10 +7,12 @@ import PrimaryButton from "../components/Button";
 import { apiPost } from "../utils/api";
 
 const Page = styled.main`
+  display: flex;
   width: min(100%, 480px);
   min-height: calc(100svh - 105px - env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 18px clamp(20px, 7.7vw, 37px) 84px;
+  padding: 18px clamp(20px, 7.7vw, 37px) 20px;
+  flex-direction: column;
   color: #090a0a;
   background: var(--color-ivory-paper);
   text-align: left;
@@ -143,6 +145,7 @@ const CharmImage = styled.img`
   max-width: 100%;
   max-height: 99px;
   object-fit: contain;
+  object-fit: contain;
 `;
 
 const shimmer = keyframes`
@@ -193,7 +196,7 @@ const Memo = styled.textarea`
 `;
 
 const CompleteButton = styled(PrimaryButton)`
-  margin-top: 37px;
+  margin-top: auto;
 `;
 
 const SubmitError = styled.p`
