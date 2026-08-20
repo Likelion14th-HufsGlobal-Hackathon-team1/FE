@@ -12,18 +12,10 @@ import bagImage from "../assets/bag1.png";
 import PrimaryButton from "../components/Button";
 import CharmKeyring from "../components/CharmKeyring";
 import { apiGet, apiPatch } from "../utils/api";
-
-const CHARM_LAYOUT_STORAGE_KEY = "onepick-charm-layout";
+import { readStoredJson, STORAGE_KEYS, writeStoredJson } from "../utils/storage";
 
 const createInitialLayout = (charms) => {
-  let savedLayout = {};
-  try {
-    savedLayout = JSON.parse(
-      localStorage.getItem(CHARM_LAYOUT_STORAGE_KEY) ?? "{}",
-    );
-  } catch {
-    savedLayout = {};
-  }
+  const savedLayout = readStoredJson(STORAGE_KEYS.charmLayout);
 
   return charms.reduce((layout, charm, index) => {
     const key = charm.instanceId ?? `${charm.id}-${index}`;
@@ -254,7 +246,11 @@ const Control = styled.label`
 `;
 
 const SaveButton = styled(PrimaryButton)`
-  margin-top: auto;
+  margin-top: clamp(48px, 10svh, 96px);
+
+  @media (max-height: 720px) {
+    margin-top: 40px;
+  }
 `;
 
 const SaveError = styled.p`
@@ -345,7 +341,7 @@ const JourneyDesign = () => {
           scale: itemLayout.size / 330,
         });
       }));
-      localStorage.setItem(CHARM_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+      writeStoredJson(STORAGE_KEYS.charmLayout, layout);
       console.info("[Charm 배치 2/2] 모든 Charm 위치를 서버에 저장했습니다.");
       navigate("/journey/charm", { state: { createdCharms: charms } });
     } catch (error) {

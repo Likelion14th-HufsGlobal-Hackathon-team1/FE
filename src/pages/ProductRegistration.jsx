@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
@@ -143,6 +143,93 @@ const ScanSuccess = styled.span`
   font-weight: 400;
   color: var(--color-walnut);
   margin-top: 4px;
+`;
+
+const ManualScanButton = styled.button`
+  border: 0;
+  padding: 3px 8px;
+  background: transparent;
+  color: var(--color-soft-taupe);
+  font-family: var(--font-kopub);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+`;
+
+const ScannerOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(33, 22, 17, 0.72);
+`;
+
+const ScannerDialog = styled.div`
+  width: min(100%, 390px);
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--color-ivory-paper);
+  box-shadow: 0 18px 50px rgba(33, 22, 17, 0.3);
+`;
+
+const ScannerTitle = styled.h2`
+  margin: 0 0 8px;
+  color: var(--color-walnut);
+  font-family: var(--font-kopub);
+  font-size: 18px;
+  font-weight: 500;
+`;
+
+const ScannerGuide = styled.p`
+  margin: 0 0 16px;
+  color: var(--color-soft-taupe);
+  font-family: var(--font-kopub);
+  font-size: 13px;
+  line-height: 1.6;
+`;
+
+const ScannerViewport = styled.div`
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  background: #17110e;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 14%;
+    border: 2px solid rgba(255, 255, 255, 0.88);
+    border-radius: 14px;
+    pointer-events: none;
+  }
+`;
+
+const ScannerVideo = styled.video`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`;
+
+const ScannerCloseButton = styled.button`
+  width: 100%;
+  height: 44px;
+  margin-top: 16px;
+  border: 1px solid var(--color-soft-taupe);
+  border-radius: 22px;
+  background: transparent;
+  color: var(--color-walnut);
+  font-family: var(--font-kopub);
+  cursor: pointer;
 `;
 
 /* ── 제품 기본 정보 ── */
@@ -456,6 +543,9 @@ const PurchaseDateDropdown = ({ label, value, options, open, onToggle, onSelect,
 /* ───────────────────── 컴포넌트 ───────────────────── */
 const ProductRegistration = () => {
   const navigate = useNavigate();
+  const scannerVideoRef = useRef(null);
+  const scannerControlsRef = useRef(null);
+  const scanHandledRef = useRef(false);
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 30 }, (_, index) => currentYear - index);
   const months = Array.from({ length: 12 }, (_, index) => index + 1);
@@ -463,6 +553,7 @@ const ProductRegistration = () => {
 
   const [scanned, setScanned] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [openDateDropdown, setOpenDateDropdown] = useState("");
@@ -479,11 +570,46 @@ const ProductRegistration = () => {
   });
   const [errors, setErrors] = useState({});
 
-  const handleScan = async () => {
-    const code = form.productCode.trim();
+  const stopScanner = () => {
+    scannerControlsRef.current?.stop();
+    scannerControlsRef.current = null;
+    if (scannerVideoRef.current?.srcObject) {
+      scannerVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      scannerVideoRef.current.srcObject = null;
+    }
+  };
+
+  const closeScanner = () => {
+    stopScanner();
+    setIsScannerOpen(false);
+    setIsScanning(false);
+  };
+
+  const extractProductCode = (rawValue) => {
+    const value = rawValue.trim();
+    if (!value) return "";
+
+    try {
+      const parsed = JSON.parse(value);
+      if (typeof parsed === "object" && parsed) {
+        return String(parsed.productCode ?? parsed.code ?? "").trim();
+      }
+    } catch {
+      // JSON이 아니면 URL 또는 제품 코드 문자열로 계속 확인합니다.
+    }
+
+    try {
+      const url = new URL(value);
+      return (url.searchParams.get("productCode") ?? url.searchParams.get("code") ?? "").trim();
+    } catch {
+      return value;
+    }
+  };
+
+  const verifyProductCode = async (rawCode) => {
+    const code = extractProductCode(rawCode);
     if (!code) {
-      setErrors((prev) => ({ ...prev, productCode: "제품 코드를 먼저 입력해주세요" }));
-      document.getElementById("pr-product-code")?.focus();
+      setServerError("QR 코드에서 제품 코드를 찾지 못했습니다.");
       return;
     }
 
@@ -492,16 +618,26 @@ const ProductRegistration = () => {
     try {
       console.info(`[Product 1/3] 제품 코드를 확인합니다. GET /api/products/scan?code=${code}`);
       const { data } = await apiGet(`/products/scan?code=${encodeURIComponent(code)}`);
+      const purchaseDate = data.purchaseDate ? String(data.purchaseDate).slice(0, 10) : "";
+      const [purchaseYear = "", purchaseMonth = "", purchaseDay = ""] = purchaseDate.split("-");
+
       setForm((prev) => ({
         ...prev,
         productCode: data.productCode ?? prev.productCode,
         productName: data.productName ?? prev.productName,
         productImage: data.productImage ?? prev.productImage,
-        purchaseYear: data.purchaseDate?.slice(0, 4) ?? prev.purchaseYear,
-        purchaseMonth: data.purchaseDate ? String(Number(data.purchaseDate.slice(5, 7))) : prev.purchaseMonth,
-        purchaseDay: data.purchaseDate ? String(Number(data.purchaseDate.slice(8, 10))) : prev.purchaseDay,
+        purchaseYear: purchaseYear || prev.purchaseYear,
+        purchaseMonth: purchaseMonth ? String(Number(purchaseMonth)) : prev.purchaseMonth,
+        purchaseDay: purchaseDay ? String(Number(purchaseDay)) : prev.purchaseDay,
+      }));
+      setErrors((prev) => ({
+        ...prev,
+        productName: "",
+        productCode: "",
+        purchaseDate: "",
       }));
       setScanned(true);
+      closeScanner();
       console.info("[Product 1/3] 제품 코드 확인을 완료했습니다.", data);
     } catch (scanError) {
       setScanned(false);
@@ -511,6 +647,64 @@ const ProductRegistration = () => {
       setIsScanning(false);
     }
   };
+
+  const handleManualScan = () => {
+    const code = form.productCode.trim();
+    if (!code) {
+      setErrors((prev) => ({ ...prev, productCode: "제품 코드를 먼저 입력해주세요" }));
+      document.getElementById("pr-product-code")?.focus();
+      return;
+    }
+    verifyProductCode(code);
+  };
+
+  const handleScan = () => {
+    setServerError("");
+    setScanned(false);
+    scanHandledRef.current = false;
+    setIsScannerOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isScannerOpen || !scannerVideoRef.current) return undefined;
+
+    let active = true;
+    setIsScanning(true);
+
+    import("@zxing/browser")
+      .then(({ BrowserQRCodeReader }) => {
+        if (!active) return null;
+        const reader = new BrowserQRCodeReader();
+        return reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: "environment" } } },
+          scannerVideoRef.current,
+          (result) => {
+            if (!active || !result || scanHandledRef.current) return;
+            scanHandledRef.current = true;
+            verifyProductCode(result.getText());
+          }
+        );
+      })
+      .then((controls) => {
+        if (!controls) return;
+        if (!active) {
+          controls.stop();
+          return;
+        }
+        scannerControlsRef.current = controls;
+      })
+      .catch((cameraError) => {
+        if (!active) return;
+        console.error("[Product 오류] 카메라를 실행하지 못했습니다.", cameraError);
+        setServerError("카메라를 실행할 수 없습니다. 권한을 허용하거나 제품 코드를 직접 입력해주세요.");
+        closeScanner();
+      });
+
+    return () => {
+      active = false;
+      stopScanner();
+    };
+  }, [isScannerOpen]);
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -635,9 +829,14 @@ const ProductRegistration = () => {
         {scanned ? (
           <ScanSuccess>스캔 완료</ScanSuccess>
         ) : (
-          <ScanButton type="button" onClick={handleScan} disabled={isScanning}>
-            {isScanning ? "확인 중..." : "스캔 시작"}
-          </ScanButton>
+          <>
+            <ScanButton type="button" onClick={handleScan} disabled={isScanning}>
+              QR 스캔 시작
+            </ScanButton>
+            <ManualScanButton type="button" onClick={handleManualScan} disabled={isScanning}>
+              입력한 제품 코드로 확인
+            </ManualScanButton>
+          </>
         )}
       </ScanCard>
 
@@ -698,6 +897,23 @@ const ProductRegistration = () => {
           {errors.purchaseDate && <ErrorText role="alert">{errors.purchaseDate}</ErrorText>}
         </ProductField>
       </ProductFields>
+
+      {isScannerOpen && (
+        <ScannerOverlay role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeScanner();
+        }}>
+          <ScannerDialog role="dialog" aria-modal="true" aria-labelledby="product-scanner-title">
+            <ScannerTitle id="product-scanner-title">QR 코드 스캔</ScannerTitle>
+            <ScannerGuide>
+              가방의 정품 태그 또는 워런티 카드 QR 코드를 사각형 안에 맞춰주세요.
+            </ScannerGuide>
+            <ScannerViewport>
+              <ScannerVideo ref={scannerVideoRef} muted playsInline />
+            </ScannerViewport>
+            <ScannerCloseButton type="button" onClick={closeScanner}>닫기</ScannerCloseButton>
+          </ScannerDialog>
+        </ScannerOverlay>
+      )}
 
       {/* 기억의 캡슐 활성화 */}
       <SectionTitle>기억의 캡슐 활성화</SectionTitle>

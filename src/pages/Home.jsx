@@ -8,8 +8,7 @@ import charmBagBase from "../assets/bag1.png";
 import mcmLogo from "../assets/mcm-logo.svg";
 import CharmKeyring from "../components/CharmKeyring";
 import { apiGet, apiPatch } from "../utils/api";
-
-const CHARM_LAYOUT_STORAGE_KEY = "onepick-charm-layout";
+import { readStoredJson, STORAGE_KEYS } from "../utils/storage";
 
 const Page = styled.div`
   width: min(100%, 480px);
@@ -560,12 +559,7 @@ const Home = () => {
         console.info("[Home Charm] 생성 Charm 목록을 조회합니다. GET /api/charms");
         const { data } = await apiGet("/charms");
         const charms = Array.isArray(data?.charms) ? data.charms : [];
-        let savedLayout = {};
-        try {
-          savedLayout = JSON.parse(localStorage.getItem(CHARM_LAYOUT_STORAGE_KEY) || "{}");
-        } catch {
-          savedLayout = {};
-        }
+        const savedLayout = readStoredJson(STORAGE_KEYS.charmLayout);
         if (!active) return;
         setHomeCharms(charms.filter((charm) => charm?.charmId != null && charm?.aiImageUrl).map((charm, index) => {
           const key = `${charm.charmId}-${index}`;
@@ -633,15 +627,8 @@ const Home = () => {
         const { data } = await apiGet("/care/reports");
         const reports = Array.isArray(data?.reports) ? data.reports : [];
         if (!active) return;
-        let reservationStores = {};
-        let reservationDates = {};
-        try {
-          reservationStores = JSON.parse(localStorage.getItem("care_reservation_stores") || "{}");
-          reservationDates = JSON.parse(localStorage.getItem("care_reservation_dates") || "{}");
-        } catch {
-          reservationStores = {};
-          reservationDates = {};
-        }
+        const reservationStores = readStoredJson(STORAGE_KEYS.reservationStores);
+        const reservationDates = readStoredJson(STORAGE_KEYS.reservationDates);
         setCareHistory(reports.map((report) => ({
           id: report.careId,
           date: reservation?.careId === report.careId

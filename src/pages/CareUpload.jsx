@@ -152,10 +152,10 @@ const ErrorMessage = styled.p`
 `;
 
 const ActionButton = styled(PrimaryButton)`
-  margin-top: auto;
+  margin-top: clamp(48px, 10svh, 96px);
 
   @media (max-height: 720px) {
-    margin-top: auto;
+    margin-top: 40px;
   }
 `;
 

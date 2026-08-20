@@ -1,8 +1,7 @@
-// 개발 환경: Vite proxy가 /api → http://1.201.116.149:8080 으로 포워딩
-// 프로덕션 환경: 직접 서버 URL 사용
+// 개발 환경은 Vite proxy를, 배포 환경은 Vercel에 등록한 API URL을 사용합니다.
 const BASE_URL = import.meta.env.DEV
   ? "/api"
-  : "http://1.201.116.149:8080";
+  : import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
 
 /**
  * 공통 fetch 래퍼.
@@ -10,12 +9,24 @@ const BASE_URL = import.meta.env.DEV
  * - JSON 요청/응답을 기본으로 처리합니다.
  */
 export async function apiFetch(path, options = {}) {
+  if (!BASE_URL) {
+    const error = new Error(
+      "API 서버 주소가 설정되지 않았습니다. VITE_API_BASE_URL을 확인해주세요."
+    );
+    error.status = 0;
+    error.code = "MISSING_API_BASE_URL";
+    throw error;
+  }
+
   const url = `${BASE_URL}${path}`;
 
   const headers = {
-    "Content-Type": "application/json",
     ...options.headers,
   };
+
+  if (options.body != null && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   // localStorage에 저장된 토큰이 있으면 자동 첨부
   const token = localStorage.getItem("accessToken");
@@ -29,7 +40,7 @@ export async function apiFetch(path, options = {}) {
       ...options,
       headers,
     });
-  } catch (networkErr) {
+  } catch {
     // fetch 자체 실패 (네트워크 끊김, CORS 차단 등)
     const error = new Error(
       "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
@@ -91,8 +102,4 @@ export function apiPatch(path, body, options = {}) {
     method: "PATCH",
     body: JSON.stringify(body),
   });
-}
-
-export function apiDelete(path, options = {}) {
-  return apiFetch(path, { ...options, method: "DELETE" });
 }

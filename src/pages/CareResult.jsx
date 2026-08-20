@@ -198,7 +198,11 @@ const ProgressMarker = styled.span`
 `;
 
 const StoreButton = styled(PrimaryButton)`
-  margin-top: auto;
+  margin-top: clamp(48px, 10svh, 96px);
+
+  @media (max-height: 720px) {
+    margin-top: 40px;
+  }
 `;
 
 const ResultMessage = styled.p`

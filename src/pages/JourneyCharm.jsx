@@ -160,7 +160,11 @@ const AddedCharm = styled.button`
 `;
 
 const VerifyButton = styled(PrimaryButton)`
-  margin-top: auto;
+  margin-top: clamp(48px, 10svh, 96px);
+
+  @media (max-height: 720px) {
+    margin-top: 40px;
+  }
 `;
 
 const LoadMessage = styled.p`
