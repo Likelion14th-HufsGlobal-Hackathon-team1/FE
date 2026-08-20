@@ -1,12 +1,9 @@
+import { useEffect, useState } from "react";
 import { TbArrowLeft } from "react-icons/tb";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import styled from "styled-components";
 
-const MOCK_DETAIL = {
-  location: "Seoul, Korea",
-  date: "2026. 08. 11 (TUE)",
-  memo: "",
-};
+import { apiGet } from "../utils/api";
 
 const Page = styled.main`
   width: min(100%, 480px);
@@ -102,10 +99,58 @@ const Memo = styled.div`
   overflow-wrap: anywhere;
 `;
 
+const PhotoGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+`;
+
+const JourneyPhoto = styled.img`
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  object-fit: cover;
+`;
+
+const StatusMessage = styled.p`
+  margin: 80px 0 0;
+  color: ${({ $error }) => ($error ? "#b42318" : "var(--color-soft-taupe)")};
+  font: 300 13px/1.5 var(--font-kopub);
+  text-align: center;
+`;
+
 const JourneyDetail = () => {
   const navigate = useNavigate();
-  const { state } = useLocation();
-  const selectedCharm = state?.selectedCharm;
+  const [searchParams] = useSearchParams();
+  const charmId = searchParams.get("charmId");
+  const [charm, setCharm] = useState(null);
+  const [isLoading, setIsLoading] = useState(Boolean(charmId));
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!charmId) return;
+    let active = true;
+    const loadCharm = async () => {
+      try {
+        console.info(`[Charm 상세] GET /api/charms/${charmId} 요청을 전송합니다.`);
+        const { data } = await apiGet(`/charms/${charmId}`);
+        if (active) setCharm(data);
+      } catch (loadError) {
+        console.error("[Charm 상세 오류] Charm 상세 조회에 실패했습니다.", loadError);
+        if (active) setError(loadError.message || "Charm 상세 정보를 불러오지 못했습니다.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    loadCharm();
+    return () => { active = false; };
+  }, [charmId]);
+
+  const formattedDate = charm?.travelDate
+    ? new Date(`${charm.travelDate}T00:00:00`).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" })
+    : "";
 
   return (
     <Page>
@@ -113,26 +158,35 @@ const JourneyDetail = () => {
         <TbArrowLeft aria-hidden="true" />
       </BackButton>
 
+      {isLoading ? <StatusMessage>Charm 정보를 불러오는 중...</StatusMessage> : error || !charm ? (
+        <StatusMessage $error role="alert">{error || "Charm 정보가 없습니다."}</StatusMessage>
+      ) : <>
       <Hero>
-        {selectedCharm?.imageUrl ? (
-          <CharmImage src={selectedCharm.imageUrl} alt="선택한 Charm" />
+        {charm.aiImageUrl ? (
+          <CharmImage src={charm.aiImageUrl} alt="선택한 Charm" />
         ) : (
           <CharmSpace aria-hidden="true" />
         )}
-        <Location>{MOCK_DETAIL.location}</Location>
-        <DateText>{MOCK_DETAIL.date}</DateText>
+        <Location>{charm.city}, {charm.country}</Location>
+        <DateText>{formattedDate}</DateText>
       </Hero>
 
       <Divider />
 
       <MemoSection>
         <SectionTitle>Charm 메모</SectionTitle>
-        <Memo>{MOCK_DETAIL.memo}</Memo>
+        <Memo>{charm.memo || "작성된 메모가 없습니다."}</Memo>
       </MemoSection>
 
       <Section>
         <SectionTitle>MCM과 함께한 여행 사진</SectionTitle>
+        <PhotoGrid>
+          {(charm.images ?? []).map((imageUrl, index) => (
+            <JourneyPhoto key={`${imageUrl}-${index}`} src={imageUrl} alt={`여행 사진 ${index + 1}`} />
+          ))}
+        </PhotoGrid>
       </Section>
+      </>}
     </Page>
   );
 };

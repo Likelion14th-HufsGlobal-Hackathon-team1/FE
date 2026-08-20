@@ -1,15 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import styled, { keyframes } from "styled-components";
+import styled from "styled-components";
 
-import DUMMY_COLLECTION from "../data/collection";
-import lockImg from "../assets/lock.png";
-
-/* ───────────────────── 애니메이션 ───────────────────── */
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
+import { apiGet } from "../utils/api";
 
 /* ───────────────────── 스타일 ───────────────────── */
 const PageWrapper = styled.div`
@@ -93,7 +86,6 @@ const CardInfo = styled.div`
   justify-content: center;
   gap: 6px;
   flex: 1;
-  padding-right: 28px;
 `;
 
 const CardName = styled.span`
@@ -106,92 +98,13 @@ const CardName = styled.span`
   word-break: keep-all;
 `;
 
-const CardLockImg = styled.img`
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-`;
-
-const CardDateRow = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-`;
-
-const CardDateText = styled.span`
-  font-family: var(--font-kopub);
-  font-size: 12px;
-  font-weight: 300;
-  color: var(--color-walnut);
-`;
-
-const CardOpenLabel = styled.span`
-  font-family: var(--font-english);
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--color-soft-taupe);
-  letter-spacing: 0.5px;
-`;
-
-/* ── DEMO ONLY - 해커톤 발표용, 추후 제거 예정 ── */
-const DemoPreviewButton = styled.button`
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  transition: transform 200ms ease;
-
-  &:hover {
-    transform: scale(1.1);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-walnut);
-    outline-offset: 2px;
-  }
-`;
-
-const OpenedState = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  animation: ${fadeIn} 0.4s ease;
-`;
-
-const DDayText = styled.span`
+const CollectionMessage = styled.p`
+  margin: 20px 0;
   font-family: var(--font-kopub);
   font-size: 13px;
-  font-weight: 500;
-  color: var(--color-walnut);
+  color: var(--color-soft-taupe);
+  text-align: center;
 `;
-
-const OpenButton = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 18px;
-  border-radius: 14px;
-  background: var(--color-walnut);
-  color: var(--color-ivory-paper);
-  font-family: var(--font-english);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  width: fit-content;
-`;
-/* ── END DEMO ONLY ── */
 
 /* ── 하단 버튼 ── */
 const RegisterButton = styled.button`
@@ -239,35 +152,29 @@ const ArrowLeftIcon = () => (
   </svg>
 );
 
-// DEMO ONLY - 해커톤 발표용, 추후 제거 예정
-const ClockIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="var(--color-walnut)"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-
 /* ───────────────────── 컴포넌트 ───────────────────── */
 const CollectionAll = () => {
   const navigate = useNavigate();
+  const [products, setProducts] = useState([]);
+  const [collectionError, setCollectionError] = useState("");
 
-  // DEMO ONLY - 해커톤 발표용, 추후 제거 예정
-  const [openedItems, setOpenedItems] = useState({});
-
-  const handleDemoOpen = (itemId) => {
-    setOpenedItems((prev) => ({ ...prev, [itemId]: true }));
-  };
-  // END DEMO ONLY
+  useEffect(() => {
+    let active = true;
+    const loadProducts = async () => {
+      try {
+        console.info("[Collection 1/2] 등록 제품 전체 목록을 조회합니다. GET /api/products");
+        const { data } = await apiGet("/products");
+        if (!active) return;
+        setProducts(Array.isArray(data?.products) ? data.products : []);
+        console.info("[Collection 2/2] 등록 제품 전체 목록을 불러왔습니다.");
+      } catch (loadError) {
+        console.error("[Collection 오류] 등록 제품 전체 목록을 불러오지 못했습니다.", loadError);
+        if (active) setCollectionError(loadError.message || "등록 제품을 불러오지 못했습니다.");
+      }
+    };
+    loadProducts();
+    return () => { active = false; };
+  }, []);
 
   return (
     <PageWrapper>
@@ -281,52 +188,25 @@ const CollectionAll = () => {
       </BackButton>
 
       {/* 타이틀 */}
-      <PageTitle>나의 컬렉션 ({DUMMY_COLLECTION.length})</PageTitle>
+      <PageTitle>나의 컬렉션 ({products.length})</PageTitle>
 
       {/* 카드 리스트 */}
       <CardList>
-        {DUMMY_COLLECTION.map((item) => (
-          <Card key={item.id}>
-            {/* DEMO ONLY - 해커톤 발표용, 추후 제거 예정 */}
-            {!openedItems[item.id] && (
-              <DemoPreviewButton
-                type="button"
-                onClick={() => handleDemoOpen(item.id)}
-                aria-label="미리보기 (데모)"
-                title="시간 빨리감기 데모"
-              >
-                <ClockIcon />
-              </DemoPreviewButton>
-            )}
-            {/* END DEMO ONLY */}
-
+        {products.map((item) => (
+          <Card key={item.productId}>
             <CardImageWrapper>
-              <CardImage src={item.image} alt={item.name} />
+              <CardImage src={item.productImage} alt={item.productName} />
             </CardImageWrapper>
 
             <CardInfo>
-              <CardName>{item.name}</CardName>
-
-              {openedItems[item.id] ? (
-                // DEMO ONLY - 오픈된 상태 UI
-                <OpenedState>
-                  <DDayText>D-Day</DDayText>
-                  <OpenButton onClick={() => { sessionStorage.removeItem("capsule_intro_shown"); navigate("/capsule-detail"); }}>
-                    open
-                  </OpenButton>
-                </OpenedState>
-              ) : (
-                <>
-                  <CardLockImg src={lockImg} alt="" aria-hidden="true" />
-                  <CardDateRow>
-                    <CardDateText>등록일 {item.startDate}</CardDateText>
-                    <CardOpenLabel>OPEN ON {item.openDate}</CardOpenLabel>
-                  </CardDateRow>
-                </>
-              )}
+              <CardName>{item.productName}</CardName>
             </CardInfo>
           </Card>
         ))}
+        {!collectionError && products.length === 0 && (
+          <CollectionMessage>등록된 제품이 없습니다.</CollectionMessage>
+        )}
+        {collectionError && <CollectionMessage role="alert">{collectionError}</CollectionMessage>}
       </CardList>
 
       {/* 새로운 제품 등록 버튼 */}

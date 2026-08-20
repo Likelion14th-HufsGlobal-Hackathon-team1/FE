@@ -1,21 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TbArrowLeft, TbSparkles } from "react-icons/tb";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 
-import generatedCharm1 from "../assets/generated-charm-1.svg";
-import generatedCharm2 from "../assets/generated-charm-2.png";
-import generatedCharm3 from "../assets/generated-charm-3.png";
 import PrimaryButton from "../components/Button";
-
-// TODO: 백엔드의 AI Charm 생성 응답인 { id, imageUrl }[]로 교체합니다.
-const GENERATED_CHARMS = [
-  { id: "generated-charm-1", imageUrl: generatedCharm1 },
-  { id: "generated-charm-2", imageUrl: generatedCharm2 },
-  { id: "generated-charm-3", imageUrl: generatedCharm3 },
-];
-
-const CREATED_CHARMS_STORAGE_KEY = "onepick-created-charms";
+import { apiPost } from "../utils/api";
 
 const Page = styled.main`
   width: min(100%, 480px);
@@ -207,48 +196,59 @@ const CompleteButton = styled(PrimaryButton)`
   margin-top: 37px;
 `;
 
+const SubmitError = styled.p`
+  margin: 12px 0 0;
+  color: #b42318;
+  font: 300 12px/1.45 var(--font-kopub);
+  text-align: center;
+`;
+
 const JourneyMake = () => {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const candidates = Array.isArray(state?.candidates) ? state.candidates : [];
+  const journeyData = state?.journeyData;
   const [selectedCharmId, setSelectedCharmId] = useState(
-    GENERATED_CHARMS[1]?.id ?? "",
+    candidates[0]?.candidateId ?? "",
   );
   const [memo, setMemo] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleComplete = () => {
-    const selectedCharm = GENERATED_CHARMS.find(
-      (charm) => charm.id === selectedCharmId,
+  useEffect(() => {
+    console.info(`[Journey Make] 전달받은 AI Charm 후보: ${candidates.length}개`);
+  }, [candidates.length]);
+
+  const handleComplete = async () => {
+    const selectedCharm = candidates.find(
+      (charm) => charm.candidateId === selectedCharmId,
     );
-    if (!selectedCharm) return;
-
-    const createdCharm = {
-      instanceId: `${selectedCharm.id}-${Date.now()}`,
-      id: selectedCharm.id,
-      imageUrl: selectedCharm.imageUrl,
-      memo,
-    };
-
-    let createdCharms = [];
-    try {
-      const savedCharms = JSON.parse(
-        localStorage.getItem(CREATED_CHARMS_STORAGE_KEY) ?? "[]",
-      );
-      if (Array.isArray(savedCharms)) createdCharms = savedCharms;
-    } catch {
-      createdCharms = [];
+    if (!selectedCharm || !journeyData) {
+      setError("여정 또는 Charm 후보 정보가 없습니다. 여정 인증부터 다시 진행해주세요.");
+      return;
     }
 
-    const nextCreatedCharms = [...createdCharms, createdCharm];
-    localStorage.setItem(
-      CREATED_CHARMS_STORAGE_KEY,
-      JSON.stringify(nextCreatedCharms),
-    );
-
-    // TODO: selectedCharmId와 memo를 백엔드에 저장한 뒤 이동합니다.
-    navigate("/journey/charm", {
-      state: {
-        createdCharms: nextCreatedCharms,
-      },
-    });
+    setError("");
+    setIsSaving(true);
+    try {
+      console.info("[Charm 저장 1/2] POST /api/charms 요청을 전송합니다.", { candidateId: selectedCharm.candidateId });
+      const { data, status } = await apiPost("/charms", {
+        productId: journeyData.productId,
+        country: journeyData.country,
+        city: journeyData.city,
+        memo: memo.trim(),
+        travelDate: journeyData.travelDate,
+        selectedImageUrl: selectedCharm.imageUrl,
+        imageUrls: journeyData.imageUrls,
+      });
+      console.info(`[Charm 저장 2/2] Charm 저장이 완료되었습니다. HTTP ${status}`, { charmId: data.charmId });
+      navigate("/journey/charm");
+    } catch (saveError) {
+      console.error("[Charm 저장 오류] Charm 저장에 실패했습니다.", saveError);
+      setError(saveError.message || "Charm 저장에 실패했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -281,17 +281,17 @@ const JourneyMake = () => {
         </SectionDescription>
 
         <CharmOptions role="radiogroup" aria-label="AI 생성 Charm 선택">
-          {GENERATED_CHARMS.map((charm, index) => {
-            const selected = selectedCharmId === charm.id;
+          {candidates.map((charm, index) => {
+            const selected = selectedCharmId === charm.candidateId;
             return (
               <CharmOption
-                key={charm.id}
+                key={charm.candidateId}
                 type="button"
                 role="radio"
                 aria-checked={selected}
                 aria-label={`AI 생성 Charm ${index + 1}`}
                 $selected={selected}
-                onClick={() => setSelectedCharmId(charm.id)}
+                onClick={() => setSelectedCharmId(charm.candidateId)}
               >
                 {charm.imageUrl ? (
                   <CharmImage src={charm.imageUrl} alt="" />
@@ -318,11 +318,12 @@ const JourneyMake = () => {
 
       <CompleteButton
         icon={<TbSparkles />}
-        disabled={!selectedCharmId}
+        disabled={!selectedCharmId || isSaving}
         onClick={handleComplete}
       >
-        Charm 생성 완료
+        {isSaving ? "Charm 저장 중..." : "Charm 생성 완료"}
       </CompleteButton>
+      {error && <SubmitError role="alert">{error}</SubmitError>}
     </Page>
   );
 };

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { RiArrowDropDownLine } from "react-icons/ri";
 import { TbPhoto, TbPhotoPlus, TbWand } from "react-icons/tb";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import PrimaryButton from "../components/Button";
+import { apiGet, apiPost } from "../utils/api";
 
 const Page = styled.main`
   display: flex;
@@ -108,6 +110,95 @@ const HiddenInput = styled.input`
   white-space: nowrap;
 `;
 
+const ProductDropdown = styled.div`
+  position: relative;
+  width: 100%;
+  margin-top: 28px;
+`;
+
+const ProductDropdownButton = styled.button`
+  display: flex;
+  width: 100%;
+  height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--color-soft-taupe);
+  border-radius: ${({ $open }) => ($open ? "8px 8px 0 0" : "8px")};
+  padding: 0 8px 0 12px;
+  color: ${({ $hasValue }) => ($hasValue ? "#090a0a" : "#a89b89")};
+  background: transparent;
+  font: 300 13px/1 var(--font-kopub);
+  text-align: left;
+  cursor: pointer;
+
+  svg { width: 23px; height: 23px; transform: rotate(${({ $open }) => ($open ? "180deg" : "0deg")}); transition: transform 160ms ease; }
+  &:focus-visible { outline: 2px solid var(--color-walnut); outline-offset: 2px; }
+`;
+
+const ProductDropdownMenu = styled.div`
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  padding: 5px;
+  border: 1px solid var(--color-soft-taupe);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: var(--color-ivory-paper);
+  box-shadow: 0 8px 18px rgba(92, 64, 51, .12);
+`;
+
+const ProductDropdownOption = styled.button`
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: 5px;
+  padding: 8px 10px;
+  color: ${({ $selected }) => ($selected ? "#fffaf2" : "#090a0a")};
+  background: ${({ $selected }) => ($selected ? "var(--color-walnut)" : "transparent")};
+  font: 300 13px/1.2 var(--font-kopub);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover, &:focus-visible { outline: none; background: ${({ $selected }) => ($selected ? "var(--color-walnut)" : "rgba(182, 168, 146, .28)")}; }
+`;
+
+const UrlField = styled.div`
+  width: 100%;
+  margin-top: 18px;
+`;
+
+const UrlLabel = styled.label`
+  display: block;
+  margin-bottom: 8px;
+  color: #090a0a;
+  font: 300 12px/1 var(--font-kopub);
+`;
+
+const UrlInput = styled.input`
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--color-soft-taupe);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #090a0a;
+  background: transparent;
+  font: 300 12px/1.3 var(--font-kopub);
+  outline: none;
+
+  &::placeholder { color: #a89b89; }
+  &:focus { border-color: var(--color-walnut); }
+`;
+
+const ErrorMessage = styled.p`
+  margin: 12px 0 0;
+  color: #b42318;
+  font: 300 12px/1.4 var(--font-kopub);
+  text-align: center;
+`;
+
 const ActionButton = styled(PrimaryButton)`
   margin-top: 45px;
 
@@ -119,8 +210,50 @@ const ActionButton = styled(PrimaryButton)`
 const CareUpload = () => {
   const navigate = useNavigate();
   const inputRef = useRef(null);
+  const productDropdownRef = useRef(null);
   const [photo, setPhoto] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [publicImageUrl, setPublicImageUrl] = useState("");
+  const [products, setProducts] = useState([]);
+  const [productId, setProductId] = useState("");
+  const [isProductOpen, setIsProductOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const loadProducts = async () => {
+      try {
+        console.info("[Care 1/6] 등록 제품을 조회합니다. GET /api/products");
+        const { data } = await apiGet("/products");
+        const list = Array.isArray(data) ? data : data?.products;
+        const normalized = Array.isArray(list)
+          ? list.map((product) => ({
+              id: product.productId ?? product.id,
+              name: product.productName ?? product.nickname ?? product.name ?? `제품 ${product.productId ?? product.id}`,
+            })).filter((product) => product.id != null)
+          : [];
+        if (!active) return;
+        setProducts(normalized);
+        if (normalized.length === 1) setProductId(String(normalized[0].id));
+        console.info(`[Care 2/6] 등록 제품 ${normalized.length}개를 확인했습니다.`);
+      } catch (loadError) {
+        if (!active) return;
+        console.error("[Care 오류] 등록 제품 조회에 실패했습니다.", loadError);
+        setError(loadError.message || "등록 제품을 불러오지 못했습니다.");
+      }
+    };
+    loadProducts();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const closeDropdown = (event) => {
+      if (!productDropdownRef.current?.contains(event.target)) setIsProductOpen(false);
+    };
+    document.addEventListener("pointerdown", closeDropdown);
+    return () => document.removeEventListener("pointerdown", closeDropdown);
+  }, []);
 
   useEffect(() => {
     if (!photo) {
@@ -134,19 +267,59 @@ const CareUpload = () => {
   }, [photo]);
 
   const openFilePicker = () => inputRef.current?.click();
+  const selectedProduct = products.find((product) => String(product.id) === productId);
+  const publicPreviewUrl = /^https?:\/\//i.test(publicImageUrl.trim()) ? publicImageUrl.trim() : "";
+  const activePreviewUrl = publicPreviewUrl || previewUrl;
 
   const handlePhotoChange = (event) => {
     const selectedPhoto = event.target.files?.[0];
-    if (selectedPhoto) setPhoto(selectedPhoto);
+    if (selectedPhoto) {
+      setPhoto(selectedPhoto);
+      setPublicImageUrl("");
+      setError("");
+    }
   };
 
-  const handleAction = () => {
-    if (!photo) {
+  const handleAction = async () => {
+    const normalizedPublicUrl = publicImageUrl.trim();
+    if (!photo && !normalizedPublicUrl) {
       openFilePicker();
       return;
     }
+    if (!productId) {
+      setError("분석할 제품을 선택해주세요.");
+      return;
+    }
 
-    navigate("/care/result", { state: { photo } });
+    setError("");
+    setIsAnalyzing(true);
+    try {
+      if (normalizedPublicUrl && !/^https?:\/\//i.test(normalizedPublicUrl)) {
+        throw new Error("http:// 또는 https://로 시작하는 공개 이미지 URL을 입력해주세요.");
+      }
+      console.info(normalizedPublicUrl
+        ? "[Care 3/6] 입력한 공개 이미지 URL을 사용합니다."
+        : "[Care 3/6] 사진을 API 전송 형식으로 변환합니다.");
+      const imageUrl = normalizedPublicUrl || await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("사진을 읽지 못했습니다."));
+          reader.readAsDataURL(photo);
+        });
+      console.info("[Care 4/6] AI 케어 분석을 요청합니다. POST /api/care/reports", { productId: Number(productId) });
+      const { data, status } = await apiPost("/care/reports", {
+        productId: Number(productId),
+        imageUrl,
+      });
+      console.info(`[Care 5/6] 분석 결과를 받았습니다. HTTP ${status}`, { careId: data.careId });
+      console.info("[Care 6/6] 분석 결과 화면으로 이동합니다.");
+      navigate(`/care/result?careId=${data.careId}`, { state: { analysis: data, photoUrl: imageUrl } });
+    } catch (analyzeError) {
+      console.error("[Care 오류] AI 케어 분석에 실패했습니다.", analyzeError);
+      setError(analyzeError.message || "가방 상태 분석에 실패했습니다.");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -160,6 +333,38 @@ const CareUpload = () => {
         </Description>
       </Intro>
 
+      <ProductDropdown ref={productDropdownRef}>
+        <ProductDropdownButton type="button" $open={isProductOpen} $hasValue={Boolean(selectedProduct)} aria-haspopup="listbox" aria-expanded={isProductOpen} onClick={() => setIsProductOpen((open) => !open)}>
+          <span>{selectedProduct?.name ?? "분석할 등록 제품을 선택해주세요"}</span>
+          <RiArrowDropDownLine aria-hidden="true" />
+        </ProductDropdownButton>
+        {isProductOpen && (
+          <ProductDropdownMenu role="listbox" aria-label="분석할 등록 제품">
+            {products.map((product) => (
+              <ProductDropdownOption key={product.id} type="button" role="option" aria-selected={String(product.id) === productId} $selected={String(product.id) === productId} onClick={() => { setProductId(String(product.id)); setIsProductOpen(false); setError(""); }}>
+                {product.name}
+              </ProductDropdownOption>
+            ))}
+          </ProductDropdownMenu>
+        )}
+      </ProductDropdown>
+
+      <UrlField>
+        <UrlLabel htmlFor="care-public-image-url">이미지 URL</UrlLabel>
+        <UrlInput
+          id="care-public-image-url"
+          type="url"
+          inputMode="url"
+          placeholder="https://.../bag.jpg"
+          value={publicImageUrl}
+          onChange={(event) => {
+            setPublicImageUrl(event.target.value);
+            setPhoto(null);
+            setError("");
+          }}
+        />
+      </UrlField>
+
       <HiddenInput
         ref={inputRef}
         type="file"
@@ -171,11 +376,15 @@ const CareUpload = () => {
       <UploadArea
         type="button"
         aria-label="가방 사진 업로드"
-        $hasPhoto={Boolean(previewUrl)}
+        $hasPhoto={Boolean(activePreviewUrl)}
         onClick={openFilePicker}
       >
-        {previewUrl ? (
-          <Preview src={previewUrl} alt="업로드한 가방 미리보기" />
+        {activePreviewUrl ? (
+          <Preview
+            src={activePreviewUrl}
+            alt="분석할 가방 미리보기"
+            onError={() => setError("입력한 이미지 URL을 불러올 수 없습니다.")}
+          />
         ) : (
           <UploadGuide>
             <TbPhotoPlus aria-hidden="true" />
@@ -184,9 +393,10 @@ const CareUpload = () => {
         )}
       </UploadArea>
 
-      <ActionButton icon={photo ? <TbWand /> : <TbPhoto />} onClick={handleAction}>
-        {photo ? "분석 결과 확인" : "사진 업로드"}
+      <ActionButton icon={photo || publicImageUrl.trim() ? <TbWand /> : <TbPhoto />} disabled={isAnalyzing} onClick={handleAction}>
+        {isAnalyzing ? "AI 분석 중..." : photo || publicImageUrl.trim() ? "분석 결과 확인" : "사진 업로드"}
       </ActionButton>
+      {error && <ErrorMessage role="alert">{error}</ErrorMessage>}
     </Page>
   );
 };

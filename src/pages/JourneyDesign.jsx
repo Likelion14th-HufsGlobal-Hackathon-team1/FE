@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   TbArrowLeft,
   TbArrowsDiagonal2,
@@ -10,20 +10,9 @@ import styled from "styled-components";
 
 import bagImage from "../assets/bag1.png";
 import PrimaryButton from "../components/Button";
+import { apiGet } from "../utils/api";
 
-const CREATED_CHARMS_STORAGE_KEY = "onepick-created-charms";
 const CHARM_LAYOUT_STORAGE_KEY = "onepick-charm-layout";
-
-const readCreatedCharms = () => {
-  try {
-    const charms = JSON.parse(
-      localStorage.getItem(CREATED_CHARMS_STORAGE_KEY) ?? "[]",
-    );
-    return Array.isArray(charms) ? charms.filter((charm) => charm?.imageUrl) : [];
-  } catch {
-    return [];
-  }
-};
 
 const createInitialLayout = (charms) => {
   let savedLayout = {};
@@ -259,11 +248,35 @@ const SaveButton = styled(PrimaryButton)`
 const JourneyDesign = () => {
   const navigate = useNavigate();
   const stageRef = useRef(null);
-  const [charms] = useState(readCreatedCharms);
-  const [layout, setLayout] = useState(() => createInitialLayout(charms));
-  const [selectedKey, setSelectedKey] = useState(
-    () => charms[0]?.instanceId ?? (charms[0] ? `${charms[0].id}-0` : ""),
-  );
+  const [charms, setCharms] = useState([]);
+  const [layout, setLayout] = useState({});
+  const [selectedKey, setSelectedKey] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const loadCharms = async () => {
+      try {
+        console.info("[Charm 꾸미기] GET /api/charms 요청을 전송합니다.");
+        const { data } = await apiGet("/charms");
+        const list = Array.isArray(data?.charms)
+          ? data.charms.map((charm) => ({
+              ...charm,
+              id: charm.charmId,
+              imageUrl: charm.aiImageUrl,
+            })).filter((charm) => charm.id != null && charm.imageUrl)
+          : [];
+        if (!active) return;
+        setCharms(list);
+        setLayout(createInitialLayout(list));
+        setSelectedKey(list[0] ? `${list[0].id}-0` : "");
+        console.info(`[Charm 꾸미기] 배치할 Charm ${list.length}개를 불러왔습니다.`);
+      } catch (loadError) {
+        console.error("[Charm 꾸미기 오류] Charm 목록 조회에 실패했습니다.", loadError);
+      }
+    };
+    loadCharms();
+    return () => { active = false; };
+  }, []);
 
   const getCharmKey = (charm, index) =>
     charm.instanceId ?? `${charm.id}-${index}`;

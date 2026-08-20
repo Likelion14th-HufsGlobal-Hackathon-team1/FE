@@ -1,11 +1,11 @@
+import { useEffect, useState } from "react";
 import { TbBookmark, TbPencil, TbPlus } from "react-icons/tb";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import bagImage from "../assets/bag1.png";
 import PrimaryButton from "../components/Button";
-
-const CREATED_CHARMS_STORAGE_KEY = "onepick-created-charms";
+import { apiGet } from "../utils/api";
 
 const CHARM_POSITIONS = [
   { top: "38%", left: "34%", rotate: "-8deg" },
@@ -162,21 +162,39 @@ const VerifyButton = styled(PrimaryButton)`
   margin-top: auto;
 `;
 
+const LoadMessage = styled.p`
+  margin: 16px 0 0;
+  color: ${({ $error }) => ($error ? "#b42318" : "var(--color-soft-taupe)")};
+  font: 300 12px/1.4 var(--font-kopub);
+  text-align: center;
+`;
+
 const JourneyCharm = () => {
   const navigate = useNavigate();
-  const { state } = useLocation();
-  let createdCharms = state?.createdCharms;
+  const [charms, setCharms] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  if (!Array.isArray(createdCharms)) {
-    try {
-      const savedCharms = JSON.parse(
-        localStorage.getItem(CREATED_CHARMS_STORAGE_KEY) ?? "[]",
-      );
-      createdCharms = Array.isArray(savedCharms) ? savedCharms : [];
-    } catch {
-      createdCharms = [];
-    }
-  }
+  useEffect(() => {
+    let active = true;
+    const loadCharms = async () => {
+      try {
+        console.info("[Charm 목록] GET /api/charms 요청을 전송합니다.");
+        const { data } = await apiGet("/charms");
+        const list = Array.isArray(data?.charms) ? data.charms : [];
+        if (!active) return;
+        setCharms(list);
+        console.info(`[Charm 목록] Charm ${list.length}개를 확인했습니다.`, { totalCountries: data?.totalCountries, totalJourneys: data?.totalJourneys });
+      } catch (loadError) {
+        console.error("[Charm 목록 오류] Charm 목록 조회에 실패했습니다.", loadError);
+        if (active) setError(loadError.message || "Charm 목록을 불러오지 못했습니다.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    loadCharms();
+    return () => { active = false; };
+  }, []);
 
   return (
     <Page>
@@ -206,26 +224,27 @@ const JourneyCharm = () => {
 
       <BagStage>
         <BagImage src={bagImage} alt="MCM 가방" />
-        {createdCharms.map((charm, index) => {
-          if (!charm?.imageUrl) return null;
+        {charms.map((charm, index) => {
+          if (!charm?.aiImageUrl) return null;
           const position = CHARM_POSITIONS[index % CHARM_POSITIONS.length];
           return (
             <AddedCharm
-              key={charm.instanceId ?? `${charm.id}-${index}`}
+              key={charm.charmId}
               type="button"
               aria-label={`생성한 Charm ${index + 1} 상세 보기`}
               $position={position}
               onClick={() =>
-                navigate("/journey/detail", {
-                  state: { selectedCharm: charm, selectedIndex: index },
-                })
+                navigate(`/journey/detail?charmId=${charm.charmId}`)
               }
             >
-              <img src={charm.imageUrl} alt="" />
+              <img src={charm.aiImageUrl} alt="" />
             </AddedCharm>
           );
         })}
       </BagStage>
+
+      {isLoading && <LoadMessage>Charm을 불러오는 중...</LoadMessage>}
+      {error && <LoadMessage $error role="alert">{error}</LoadMessage>}
 
       <VerifyButton
         icon={<TbPlus />}

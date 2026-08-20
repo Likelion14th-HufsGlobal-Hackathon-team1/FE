@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import qrcodeImg from "../assets/qrcode.png";
+import { apiGet, apiPost } from "../utils/api";
 
 /* ───────────────────── 스타일 ───────────────────── */
 const PageWrapper = styled.div`
@@ -461,6 +462,9 @@ const ProductRegistration = () => {
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
 
   const [scanned, setScanned] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState("");
   const [openDateDropdown, setOpenDateDropdown] = useState("");
   const [form, setForm] = useState({
     productName: "",
@@ -474,12 +478,42 @@ const ProductRegistration = () => {
   });
   const [errors, setErrors] = useState({});
 
-  const handleScan = () => {
-    setScanned(true);
+  const handleScan = async () => {
+    const code = form.productCode.trim();
+    if (!code) {
+      setErrors((prev) => ({ ...prev, productCode: "제품 코드를 먼저 입력해주세요" }));
+      document.getElementById("pr-product-code")?.focus();
+      return;
+    }
+
+    setIsScanning(true);
+    setServerError("");
+    try {
+      console.info(`[Product 1/3] 제품 코드를 확인합니다. GET /api/products/scan?code=${code}`);
+      const { data } = await apiGet(`/products/scan?code=${encodeURIComponent(code)}`);
+      setForm((prev) => ({
+        ...prev,
+        productCode: data.productCode ?? prev.productCode,
+        productName: data.productName ?? prev.productName,
+        purchaseYear: data.purchaseDate?.slice(0, 4) ?? prev.purchaseYear,
+        purchaseMonth: data.purchaseDate ? String(Number(data.purchaseDate.slice(5, 7))) : prev.purchaseMonth,
+        purchaseDay: data.purchaseDate ? String(Number(data.purchaseDate.slice(8, 10))) : prev.purchaseDay,
+      }));
+      setScanned(true);
+      console.info("[Product 1/3] 제품 코드 확인을 완료했습니다.", data);
+    } catch (scanError) {
+      setScanned(false);
+      setServerError(scanError.message || "제품 코드를 확인하지 못했습니다.");
+      console.error("[Product 오류] 제품 코드 확인에 실패했습니다.", scanError);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    if (field === "productCode") setScanned(false);
+    setServerError("");
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -531,40 +565,31 @@ const ProductRegistration = () => {
     return valid;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-
-    // 오픈 예정일 계산 (여정 시작일 + 10년)
-    const dateParts = form.startDate.replace(/[-./]/g, ".").split(".");
-    let openDate = form.startDate;
-    if (dateParts.length >= 3) {
-      const year = parseInt(dateParts[0], 10) + 10;
-      openDate = `${year}.${dateParts[1]}.${dateParts[2]}`;
-    }
-
-    // 마이페이지 컬렉션에 추가 (localStorage 임시 저장)
-    const newItem = {
-      id: Date.now(),
-      productName: form.productName,
-      productCode: form.productCode,
-      purchaseDate: `${form.purchaseYear}-${String(form.purchaseMonth).padStart(2, "0")}-${String(form.purchaseDay).padStart(2, "0")}`,
-      name: form.nickname || "새로 등록한 제품",
-      startDate: form.startDate,
-      openDate,
-      memory: form.memory,
-    };
+    setIsSubmitting(true);
+    setServerError("");
+    const purchaseDate = `${form.purchaseYear}-${String(form.purchaseMonth).padStart(2, "0")}-${String(form.purchaseDay).padStart(2, "0")}`;
 
     try {
-      const existing = JSON.parse(
-        localStorage.getItem("user_collection") || "[]"
-      );
-      existing.push(newItem);
-      localStorage.setItem("user_collection", JSON.stringify(existing));
-    } catch {
-      // localStorage 실패 시 무시
+      console.info("[Product 2/3] 제품을 등록합니다. POST /api/products", {
+        productCode: form.productCode.trim(),
+        productName: form.productName.trim(),
+        purchaseDate,
+      });
+      const { data } = await apiPost("/products", {
+        productCode: form.productCode.trim(),
+        productName: form.productName.trim(),
+        purchaseDate,
+      });
+      console.info("[Product 2/3] 제품 등록을 완료했습니다.", data);
+      navigate("/home", { replace: true, state: { registeredProductId: data.productId } });
+    } catch (submitError) {
+      setServerError(submitError.message || "제품 등록에 실패했습니다.");
+      console.error("[Product 오류] 제품 등록에 실패했습니다.", submitError);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    navigate("/mypage");
   };
 
   return (
@@ -602,8 +627,8 @@ const ProductRegistration = () => {
         {scanned ? (
           <ScanSuccess>스캔 완료</ScanSuccess>
         ) : (
-          <ScanButton type="button" onClick={handleScan}>
-            스캔 시작
+          <ScanButton type="button" onClick={handleScan} disabled={isScanning}>
+            {isScanning ? "확인 중..." : "스캔 시작"}
           </ScanButton>
         )}
       </ScanCard>
@@ -719,9 +744,11 @@ const ProductRegistration = () => {
         </FieldGroup>
       </FormCard>
 
+      {serverError && <ErrorText role="alert">{serverError}</ErrorText>}
+
       {/* 제품 등록 버튼 */}
-      <SubmitButton type="button" onClick={handleSubmit}>
-        제품 등록
+      <SubmitButton type="button" onClick={handleSubmit} disabled={isSubmitting}>
+        {isSubmitting ? "등록 중..." : "제품 등록"}
       </SubmitButton>
     </PageWrapper>
   );

@@ -1,29 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AiOutlineClose } from "react-icons/ai";
 import { TbSearch } from "react-icons/tb";
 import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
-import charmBag from "../assets/charm-bag.svg";
+import charmBagBase from "../assets/bag1.png";
 import mcmLogo from "../assets/mcm-logo.svg";
+import { apiGet, apiPatch } from "../utils/api";
 
-const PRODUCTS = [
-  { id: "MCM-000001", name: "Aren Shopper", registered: "2026.08.11" },
-  { id: "MCM-000002", name: "Stark Backpack", registered: "2026.05.02" },
-  { id: "MCM-000003", name: "Liz Shopper", registered: "2025.12.18" },
-];
-
-const CARE_HISTORY = [
-  { date: "2026.08.11", status: "양호", store: "미방문" },
-  { date: "2026.02.24", status: "매장 방문 필요", store: "MCM 강남점" },
-  { date: "2025.08.31", status: "양호", store: "미방문" },
-];
-
-// TODO: 백엔드 로그인 응답의 케어 알림 정보로 교체합니다.
-const CARE_REMINDER = {
-  shouldShow: true,
-  intervalMonths: 3,
-};
+const CHARM_LAYOUT_STORAGE_KEY = "onepick-charm-layout";
 
 const Page = styled.div`
   width: min(100%, 480px);
@@ -238,11 +223,6 @@ const Title = styled.h2`
   font: 300 20px/1 var(--font-kopub);
 `;
 
-const Description = styled.p`
-  margin-top: 8px;
-  font: 300 14px/1.25 var(--font-kopub);
-`;
-
 const ToggleRow = styled.div`
   display: flex;
   flex: 0 0 auto;
@@ -317,11 +297,30 @@ const CharmSection = styled.section`
   padding-top: 20px;
 `;
 
-const CharmImage = styled.img`
-  display: block;
+const HomeCharmStage = styled.div`
+  position: relative;
   width: min(282px, 86vw);
-  height: auto;
+  aspect-ratio: 198 / 144;
   margin: 10px auto 0;
+`;
+
+const HomeBagImage = styled.img`
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+`;
+
+const HomePlacedCharm = styled.img`
+  position: absolute;
+  z-index: 2;
+  top: ${({ $y }) => $y}%;
+  left: ${({ $x }) => $x}%;
+  width: ${({ $size }) => ($size / 330) * 100}%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.16));
+  transform: translate(-50%, -50%) rotate(${({ $rotation }) => $rotation}deg);
 `;
 
 const ModalLayer = styled.div`
@@ -459,15 +458,191 @@ const Home = () => {
   const { state } = useLocation();
   const reservation = state?.reservationComplete;
   const [flippedCards, setFlippedCards] = useState(() => new Set());
-  const [careAlert, setCareAlert] = useState(true);
+  const [products, setProducts] = useState([]);
+  const [productDetails, setProductDetails] = useState({});
+  const [homeCharms, setHomeCharms] = useState([]);
+  const [careAlert, setCareAlert] = useState(() => {
+    try {
+      return localStorage.getItem("care_alert_enabled") !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const [careHistory, setCareHistory] = useState([]);
+  const [careNotifications, setCareNotifications] = useState([]);
+  const [activeNotification, setActiveNotification] = useState(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
-  const [showCareReminder, setShowCareReminder] = useState(
-    CARE_REMINDER.shouldShow && !reservation,
-  );
+  const [showCareReminder, setShowCareReminder] = useState(false);
   const [showReservationComplete, setShowReservationComplete] = useState(Boolean(reservation));
   const cardViewport = useRef(null);
   const dragState = useRef(null);
   const suppressCardClick = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    const loadHomeCharms = async () => {
+      try {
+        console.info("[Home Charm] 생성 Charm 목록을 조회합니다. GET /api/charms");
+        const { data } = await apiGet("/charms");
+        const charms = Array.isArray(data?.charms) ? data.charms : [];
+        let savedLayout = {};
+        try {
+          savedLayout = JSON.parse(localStorage.getItem(CHARM_LAYOUT_STORAGE_KEY) || "{}");
+        } catch {
+          savedLayout = {};
+        }
+        if (!active) return;
+        setHomeCharms(charms.filter((charm) => charm?.charmId != null && charm?.aiImageUrl).map((charm, index) => {
+          const key = `${charm.charmId}-${index}`;
+          return {
+            key,
+            imageUrl: charm.aiImageUrl,
+            layout: savedLayout[key] ?? {
+              x: 28 + (index % 4) * 15,
+              y: 43 + (index % 2) * 19,
+              rotation: index % 2 === 0 ? -6 : 6,
+              size: 54,
+            },
+          };
+        }));
+        console.info(`[Home Charm] 생성 Charm ${charms.length}개를 가방에 반영했습니다.`);
+      } catch (charmError) {
+        console.error("[Home Charm 오류] Charm 목록 조회에 실패했습니다.", charmError);
+      }
+    };
+    loadHomeCharms();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadProducts = async () => {
+      try {
+        console.info("[Product 3/3] 등록 제품 목록을 조회합니다. GET /api/products");
+        const { data } = await apiGet("/products");
+        const list = Array.isArray(data?.products) ? data.products : [];
+        if (!active) return;
+        setProducts(list.map((product) => ({
+          id: product.productId,
+          name: product.productName,
+          image: product.productImage,
+        })));
+        setActiveCardIndex(0);
+        console.info(`[Product 3/3] 등록 제품 ${list.length}개를 불러왔습니다.`);
+      } catch (productError) {
+        console.error("[Product 오류] 등록 제품 목록 조회에 실패했습니다.", productError);
+        if (active) setProducts([]);
+      }
+    };
+    loadProducts();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadCareHistory = async () => {
+      try {
+        console.info("[Home Care] 케어 이력을 조회합니다. GET /api/care/reports");
+        const { data } = await apiGet("/care/reports");
+        const reports = Array.isArray(data?.reports) ? data.reports : [];
+        if (!active) return;
+        let reservationStores = {};
+        let reservationDates = {};
+        try {
+          reservationStores = JSON.parse(localStorage.getItem("care_reservation_stores") || "{}");
+          reservationDates = JSON.parse(localStorage.getItem("care_reservation_dates") || "{}");
+        } catch {
+          reservationStores = {};
+          reservationDates = {};
+        }
+        setCareHistory(reports.map((report) => ({
+          id: report.careId,
+          date: reservation?.careId === report.careId
+            ? reservation.date.replace(/\s*\([^)]*\)$/, "")
+            : reservationDates[String(report.careId)]
+              ? new Date(`${reservationDates[String(report.careId)]}T00:00:00`).toLocaleDateString("ko-KR").replace(/\. /g, ".").replace(/\.$/, "")
+              : "-",
+          product: report.product?.productName ?? "-",
+          store: reservation?.careId === report.careId
+            ? reservation.store
+            : reservationStores[String(report.careId)] ?? "미예약",
+        })));
+        console.info(`[Home Care] 케어 이력 ${reports.length}건을 확인했습니다.`);
+      } catch (historyError) {
+        console.error("[Home Care 오류] 케어 이력 조회에 실패했습니다.", historyError);
+      }
+    };
+    loadCareHistory();
+    return () => { active = false; };
+  }, [reservation]);
+
+  useEffect(() => {
+    let active = true;
+    const loadNotifications = async () => {
+      try {
+        console.info("[Home Care] 케어 알림을 조회합니다. GET /api/care/notifications");
+        const { data } = await apiGet("/care/notifications");
+        const notifications = Array.isArray(data?.notifications) ? data.notifications : [];
+        if (!active) return;
+        setCareNotifications(notifications);
+        const unread = notifications.find((notification) => !notification.isRead);
+        if (careAlert && unread && !reservation) {
+          setActiveNotification(unread);
+          setShowCareReminder(true);
+        }
+        console.info(`[Home Care] 읽지 않은 케어 알림 ${notifications.filter((item) => !item.isRead).length}건을 확인했습니다.`);
+      } catch (notificationError) {
+        console.error("[Home Care 오류] 케어 알림 조회에 실패했습니다.", notificationError);
+      }
+    };
+    loadNotifications();
+    return () => { active = false; };
+  }, [careAlert, reservation]);
+
+  const handleCareAlertToggle = () => {
+    setCareAlert((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem("care_alert_enabled", String(next));
+      } catch {
+        // 브라우저 저장소를 사용할 수 없어도 현재 화면의 토글은 동작합니다.
+      }
+      if (!next) {
+        setShowCareReminder(false);
+      } else {
+        const unread = careNotifications.find((notification) => !notification.isRead);
+        setActiveNotification(unread ?? null);
+        setShowCareReminder(Boolean(unread));
+      }
+      return next;
+    });
+  };
+
+  const readActiveNotification = async () => {
+    if (!activeNotification) {
+      setShowCareReminder(false);
+      return;
+    }
+    try {
+      await apiPatch(`/care/notifications/${activeNotification.notificationId}/read`);
+      setCareNotifications((current) => current.map((notification) =>
+        notification.notificationId === activeNotification.notificationId
+          ? { ...notification, isRead: true }
+          : notification,
+      ));
+      console.info(`[Home Care] 알림 ${activeNotification.notificationId}을 읽음 처리했습니다.`);
+    } catch (readError) {
+      console.error("[Home Care 오류] 알림 읽음 처리에 실패했습니다.", readError);
+    } finally {
+      setShowCareReminder(false);
+      setActiveNotification(null);
+    }
+  };
+
+  const openCareUpload = async () => {
+    await readActiveNotification();
+    navigate("/care/upload");
+  };
 
   const closeReservationComplete = () => {
     setShowReservationComplete(false);
@@ -515,18 +690,19 @@ const Home = () => {
 
     const cardStep = firstCard.offsetWidth + 15;
     const nextIndex = Math.min(
-      PRODUCTS.length - 1,
+      Math.max(0, products.length - 1),
       Math.max(0, Math.round(event.currentTarget.scrollLeft / cardStep)),
     );
     setActiveCardIndex(nextIndex);
   };
 
-  const handleCardClick = (productId) => {
+  const handleCardClick = async (productId) => {
     if (suppressCardClick.current) {
       suppressCardClick.current = false;
       return;
     }
 
+    const willOpen = !flippedCards.has(productId);
     setFlippedCards((current) => {
       const next = new Set(current);
       if (next.has(productId)) {
@@ -536,12 +712,22 @@ const Home = () => {
       }
       return next;
     });
+
+    if (willOpen && !productDetails[productId]) {
+      try {
+        console.info(`[Product 상세] 제품 ${productId} 정보를 조회합니다. GET /api/products/${productId}`);
+        const { data } = await apiGet(`/products/${productId}`);
+        setProductDetails((current) => ({ ...current, [productId]: data }));
+      } catch (detailError) {
+        console.error(`[Product 오류] 제품 ${productId} 상세 조회에 실패했습니다.`, detailError);
+      }
+    }
   };
 
   return (
     <Page>
       <RegisterBar>
-        <RegisterButton type="button" onClick={() => navigate("/mypage")}>
+        <RegisterButton type="button" onClick={() => navigate("/product-registration")}>
           제품 등록
         </RegisterButton>
       </RegisterBar>
@@ -556,8 +742,9 @@ const Home = () => {
         onScroll={handleCardScroll}
       >
         <CardTrack>
-          {PRODUCTS.map((product, index) => {
+          {products.map((product, index) => {
             const isFlipped = flippedCards.has(product.id);
+            const detail = productDetails[product.id];
 
             return (
               <CardButton
@@ -577,11 +764,11 @@ const Home = () => {
                     <Certificate>CERTIFICATE OF AUTHENTICITY</Certificate>
                     <ProductDetails>
                       <span>Product</span>
-                      <span>{product.name}</span>
+                      <span>{detail?.productName ?? product.name}</span>
                       <span>Product ID</span>
-                      <span>{product.id}</span>
-                      <span>Registered</span>
-                      <span>{product.registered}</span>
+                      <span>{detail?.productCode ?? product.id}</span>
+                      <span>Purchase Date</span>
+                      <span>{detail?.purchaseDate ? new Date(`${detail.purchaseDate}T00:00:00`).toLocaleDateString("ko-KR").replace(/\. /g, ".").replace(/\.$/, "") : "-"}</span>
                     </ProductDetails>
                   </CardBack>
                 </CardInner>
@@ -592,7 +779,7 @@ const Home = () => {
       </CardViewport>
 
       <Pagination aria-hidden="true">
-        {PRODUCTS.map((product, index) => (
+        {products.map((product, index) => (
           <PaginationDot key={product.id} $active={activeCardIndex === index} />
         ))}
       </Pagination>
@@ -602,7 +789,6 @@ const Home = () => {
           <CareHeader>
             <div>
               <Title>AI Care</Title>
-              <Description>현재 좋은 상태를 유지하고 있어요.</Description>
             </div>
             <ToggleRow>
               <span>케어주기 알림</span>
@@ -613,7 +799,7 @@ const Home = () => {
                 aria-checked={careAlert}
                 aria-label="케어주기 알림"
                 $checked={careAlert}
-                onClick={() => setCareAlert((current) => !current)}
+                onClick={handleCareAlertToggle}
               />
               <span>Off</span>
             </ToggleRow>
@@ -622,20 +808,20 @@ const Home = () => {
           <CareTable>
             <CareColumn>
               <ColumnTitle>케어 일자</ColumnTitle>
-              {CARE_HISTORY.map((care) => (
-                <CareValue key={care.date}>•&nbsp; {care.date}</CareValue>
+              {careHistory.map((care) => (
+                <CareValue key={care.id}>•&nbsp; {care.date}</CareValue>
               ))}
             </CareColumn>
             <CareColumn>
-              <ColumnTitle>제품 상태</ColumnTitle>
-              {CARE_HISTORY.map((care) => (
-                <CareValue key={care.date}>{care.status}</CareValue>
+              <ColumnTitle>케어 제품</ColumnTitle>
+              {careHistory.map((care) => (
+                <CareValue key={care.id}>{care.product}</CareValue>
               ))}
             </CareColumn>
             <CareColumn>
               <ColumnTitle>이용 매장</ColumnTitle>
-              {CARE_HISTORY.map((care) => (
-                <CareValue key={care.date}>{care.store}</CareValue>
+              {careHistory.map((care) => (
+                <CareValue key={care.id}>{care.store}</CareValue>
               ))}
             </CareColumn>
           </CareTable>
@@ -643,7 +829,20 @@ const Home = () => {
 
         <CharmSection>
           <Title>나의 Charm</Title>
-          <CharmImage src={charmBag} alt="참 장식이 달린 MCM 가방" />
+          <HomeCharmStage aria-label="내가 꾸민 MCM 가방">
+            <HomeBagImage src={charmBagBase} alt="MCM 가방" />
+            {homeCharms.map((charm, index) => (
+              <HomePlacedCharm
+                key={charm.key}
+                src={charm.imageUrl}
+                alt={`생성한 Charm ${index + 1}`}
+                $x={charm.layout.x}
+                $y={charm.layout.y}
+                $size={charm.layout.size}
+                $rotation={charm.layout.rotation}
+              />
+            ))}
+          </HomeCharmStage>
         </CharmSection>
       </MainContent>
 
@@ -679,15 +878,16 @@ const Home = () => {
             <CloseButton
               type="button"
               aria-label="케어 알림 닫기"
-              onClick={() => setShowCareReminder(false)}
+              onClick={readActiveNotification}
             >
               <AiOutlineClose aria-hidden="true" />
             </CloseButton>
 
             <ReminderTitle id="care-reminder-title">Care Reminder</ReminderTitle>
             <ReminderMessage id="care-reminder-description">
-              마지막 케어 이후 {CARE_REMINDER.intervalMonths}개월이 지났어요.
+              제품 케어 예정일이 다가왔어요.
               <br />
+              {activeNotification?.targetDate && <>{activeNotification.targetDate} 전후로<br /></>}
               오래도록 좋은 상태를 유지할 수 있도록
               <br />
               지금 컨디션을 확인해보세요.
@@ -695,7 +895,7 @@ const Home = () => {
 
             <CareBookingButton
               type="button"
-              onClick={() => navigate("/care/upload")}
+              onClick={openCareUpload}
             >
               <TbSearch aria-hidden="true" />
               MCM 케어 상담 예약
