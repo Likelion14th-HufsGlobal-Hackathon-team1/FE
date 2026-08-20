@@ -1,24 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiArrowLeft, FiChevronDown, FiChevronLeft, FiChevronRight, FiSearch, FiShoppingBag } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
-const STORES = [
-  { id: 1, name: "MCM 롯데백화점 강남점", address: "서울 강남구 도곡로 401" },
-  { id: 2, name: "MCM 현대백화점 무역센터점", address: "서울 강남구 테헤란로 517" },
-  { id: 3, name: "MCM 롯데백화점 본점", address: "서울 중구 남대문로 81" },
-  { id: 4, name: "MCM 신세계백화점 센텀시티점", address: "부산 해운대구 센텀남대로 35" },
-  { id: 5, name: "MCM 신세계백화점 대구점", address: "대구 동구 동부로 149" },
-];
+import { apiGet, apiPost } from "../utils/api";
 
-const REGISTERED_PRODUCTS = [
-  { id: "MCM-000001", name: "Aren Shopper" },
-  { id: "MCM-000002", name: "Stark Backpack" },
-  { id: "MCM-000003", name: "Liz Shopper" },
-];
-
-const TIMES = ["8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const SEOUL_LOCATION = { lat: 37.5665, lng: 126.978 };
+const formatApiDate = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
 
 const Page = styled.main`
   width: min(100%, 480px); min-height: 100svh; margin: 0 auto; padding: 28px 36px 34px;
@@ -110,24 +99,99 @@ const SubmitButton = styled.button`
   border: 0; border-radius: 28px; color: #fffaf2; background: var(--color-walnut); font: 400 17px var(--font-kopub); cursor: pointer;
   &:disabled { opacity: .45; cursor: not-allowed; }
 `;
+const FormMessage = styled.p`
+  margin: 12px 0 0; color: ${({ $error }) => ($error ? "#b42318" : "#8e8172")};
+  font: 300 11px/1.4 var(--font-kopub); text-align: center;
+`;
 
 function Reservation() {
   const navigate = useNavigate();
   const today = new Date();
   const [query, setQuery] = useState("");
+  const [stores, setStores] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
   const [isStoreOpen, setIsStoreOpen] = useState(true);
   const [visibleMonth, setVisibleMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState("");
+  const [availableTimes, setAvailableTimes] = useState([]);
   const [careItem, setCareItem] = useState("");
+  const [careItems, setCareItems] = useState([]);
   const [isCareItemOpen, setIsCareItemOpen] = useState(false);
+  const [isLoadingTimes, setIsLoadingTimes] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const getLocation = () => new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(SEOUL_LOCATION);
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }),
+        () => {
+          console.warn("[Reservation] 위치 권한이 없어 서울시청 좌표를 사용합니다.");
+          resolve(SEOUL_LOCATION);
+        },
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 },
+      );
+    });
+
+    const loadInitialData = async () => {
+      try {
+        const location = await getLocation();
+        console.info("[Reservation 1/4] 주변 매장과 Care 이력을 조회합니다.", location);
+        const [storeResponse, careResponse] = await Promise.all([
+          apiGet(`/stores?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`),
+          apiGet("/care/reports"),
+        ]);
+        if (!active) return;
+        const storeList = Array.isArray(storeResponse.data?.stores) ? storeResponse.data.stores : [];
+        setStores(storeList.map((store) => ({ ...store, id: store.storeId })));
+        const reports = Array.isArray(careResponse.data?.reports) ? careResponse.data.reports : [];
+        setCareItems(reports.map((report) => ({
+          id: String(report.careId),
+          name: report.product?.productName ?? `Care #${report.careId}`,
+        })));
+        console.info(`[Reservation 2/4] 매장 ${storeList.length}개, Care 이력 ${reports.length}건을 확인했습니다.`);
+      } catch (loadError) {
+        console.error("[Reservation 오류] 초기 데이터 조회에 실패했습니다.", loadError);
+        if (active) setError(loadError.message || "예약 정보를 불러오지 못했습니다.");
+      }
+    };
+    loadInitialData();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedStore || !selectedDate) {
+      setAvailableTimes([]);
+      return;
+    }
+    let active = true;
+    const loadTimes = async () => {
+      setIsLoadingTimes(true);
+      setError("");
+      try {
+        const date = formatApiDate(selectedDate);
+        console.info(`[Reservation 3/4] 예약 가능 시간을 조회합니다. storeId=${selectedStore.id}, date=${date}`);
+        const { data } = await apiGet(`/stores/${selectedStore.id}/available-times?date=${encodeURIComponent(date)}`);
+        if (active) setAvailableTimes(Array.isArray(data?.availableTimes) ? data.availableTimes : []);
+      } catch (timeError) {
+        console.error("[Reservation 오류] 예약 가능 시간 조회에 실패했습니다.", timeError);
+        if (active) setError(timeError.message || "예약 가능 시간을 불러오지 못했습니다.");
+      } finally {
+        if (active) setIsLoadingTimes(false);
+      }
+    };
+    loadTimes();
+    return () => { active = false; };
+  }, [selectedDate, selectedStore]);
 
   const filteredStores = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return [];
-    return STORES.filter(({ name, address }) => `${name} ${address}`.toLowerCase().includes(keyword));
-  }, [query]);
+    return stores.filter(({ name, address }) => `${name} ${address}`.toLowerCase().includes(keyword));
+  }, [query, stores]);
 
   const calendarDays = useMemo(() => {
     const year = visibleMonth.getFullYear();
@@ -145,10 +209,34 @@ function Reservation() {
   const isSelectedDay = (day) => selectedDate && selectedDate.getFullYear() === visibleMonth.getFullYear()
     && selectedDate.getMonth() === visibleMonth.getMonth() && selectedDate.getDate() === day;
   const canSubmit = selectedStore && selectedDate && selectedTime && careItem;
-  const selectedProduct = REGISTERED_PRODUCTS.find((product) => product.id === careItem);
+  const selectedCareItem = careItems.find((item) => item.id === careItem);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return;
+    setIsSubmitting(true);
+    setError("");
+    try {
+      const reservationDate = formatApiDate(selectedDate);
+      console.info("[Reservation 4/4] 매장 예약을 생성합니다. POST /api/care/reservations", {
+        careId: Number(careItem), storeId: selectedStore.id, reservationDate, reservationTime: selectedTime,
+      });
+      await apiPost("/care/reservations", {
+        careId: Number(careItem),
+        storeId: selectedStore.id,
+        reservationDate,
+        reservationTime: selectedTime,
+      });
+      try {
+        const savedStores = JSON.parse(localStorage.getItem("care_reservation_stores") || "{}");
+        savedStores[String(careItem)] = selectedStore.name;
+        localStorage.setItem("care_reservation_stores", JSON.stringify(savedStores));
+
+        const savedDates = JSON.parse(localStorage.getItem("care_reservation_dates") || "{}");
+        savedDates[String(careItem)] = reservationDate;
+        localStorage.setItem("care_reservation_dates", JSON.stringify(savedDates));
+      } catch {
+        // 저장소를 사용할 수 없어도 예약 완료 화면은 정상적으로 표시합니다.
+      }
     const date = [
       selectedDate.getFullYear(),
       String(selectedDate.getMonth() + 1).padStart(2, "0"),
@@ -159,13 +247,20 @@ function Reservation() {
     navigate("/home", {
       state: {
         reservationComplete: {
+          careId: Number(careItem),
           date: `${date} (${weekday})`,
           time: selectedTime,
-          care: selectedProduct.name,
+          care: selectedCareItem.name,
           store: selectedStore.name,
         },
       },
     });
+    } catch (submitError) {
+      console.error("[Reservation 오류] 예약 생성에 실패했습니다.", submitError);
+      setError(submitError.message || "매장 예약에 실패했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -190,8 +285,8 @@ function Reservation() {
               {query.trim() && (
                 <StoreList role="listbox" aria-label="MCM 매장 검색 결과">
                   {filteredStores.length ? filteredStores.map((store) => (
-                    <StoreButton key={store.id} type="button" role="option" aria-selected={selectedStore?.id === store.id} $selected={selectedStore?.id === store.id} onClick={() => { setSelectedStore(store); setQuery(""); setIsStoreOpen(false); }}>
-                      <strong>{store.name}</strong><span>{store.address}</span>
+                    <StoreButton key={store.id} type="button" role="option" aria-selected={selectedStore?.id === store.id} $selected={selectedStore?.id === store.id} onClick={() => { setSelectedStore(store); setSelectedTime(""); setQuery(""); setIsStoreOpen(false); }}>
+                      <strong>{store.name}</strong><span>{store.address}{store.distanceKm != null ? ` · ${store.distanceKm.toFixed(1)}km` : ""}</span>
                     </StoreButton>
                   )) : <Empty>검색 결과가 없습니다.</Empty>}
                 </StoreList>
@@ -218,31 +313,36 @@ function Reservation() {
 
       <Section>
         <Label>TIME</Label>
-        <TimeGrid>{TIMES.map((time) => (
+        <TimeGrid>{availableTimes.map((time) => (
           <TimeButton key={time} type="button" $selected={selectedTime === time} onClick={() => setSelectedTime(time)}>{time}</TimeButton>
         ))}</TimeGrid>
+        {isLoadingTimes && <FormMessage>예약 가능 시간을 불러오는 중...</FormMessage>}
+        {!isLoadingTimes && selectedStore && selectedDate && availableTimes.length === 0 && <FormMessage>선택한 날짜에 예약 가능한 시간이 없습니다.</FormMessage>}
+        {!selectedStore || !selectedDate ? <FormMessage>매장과 날짜를 먼저 선택해주세요.</FormMessage> : null}
       </Section>
 
       <Section>
         <Label>CARE ITEM</Label>
         <SelectWrap>
-          <SelectButton type="button" $open={isCareItemOpen} $hasValue={Boolean(selectedProduct)} aria-haspopup="listbox" aria-expanded={isCareItemOpen} onClick={() => setIsCareItemOpen((open) => !open)}>
-            <span>{selectedProduct ? `${selectedProduct.name} · ${selectedProduct.id}` : "등록 제품을 선택해 주세요"}</span>
+          <SelectButton type="button" $open={isCareItemOpen} $hasValue={Boolean(selectedCareItem)} aria-haspopup="listbox" aria-expanded={isCareItemOpen} onClick={() => setIsCareItemOpen((open) => !open)}>
+            <span>{selectedCareItem ? selectedCareItem.name : "케어할 제품을 선택해주세요"}</span>
             <FiChevronDown aria-hidden="true" />
           </SelectButton>
           {isCareItemOpen && (
             <OptionList role="listbox" aria-label="등록 제품">
-              {REGISTERED_PRODUCTS.map((product) => (
-                <OptionButton key={product.id} type="button" role="option" aria-selected={careItem === product.id} $selected={careItem === product.id} onClick={() => { setCareItem(product.id); setIsCareItemOpen(false); }}>
-                  {product.name} · {product.id}
+              {careItems.map((item) => (
+                <OptionButton key={item.id} type="button" role="option" aria-selected={careItem === item.id} $selected={careItem === item.id} onClick={() => { setCareItem(item.id); setIsCareItemOpen(false); }}>
+                  {item.name}
                 </OptionButton>
               ))}
+              {careItems.length === 0 && <Empty>예약 가능한 케어 분석 이력이 없습니다.</Empty>}
             </OptionList>
           )}
         </SelectWrap>
       </Section>
 
-      <SubmitButton type="button" disabled={!canSubmit} onClick={handleSubmit}><FiShoppingBag aria-hidden="true" />매장 예약</SubmitButton>
+      <SubmitButton type="button" disabled={!canSubmit || isSubmitting} onClick={handleSubmit}><FiShoppingBag aria-hidden="true" />{isSubmitting ? "예약 중..." : "매장 예약"}</SubmitButton>
+      {error && <FormMessage $error role="alert">{error}</FormMessage>}
     </Page>
   );
 }

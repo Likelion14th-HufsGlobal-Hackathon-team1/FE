@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RiArrowDropDownLine } from "react-icons/ri";
-import { TbArrowLeft, TbCamera, TbPlus, TbSparkles } from "react-icons/tb";
+import { TbArrowLeft, TbCamera, TbSparkles } from "react-icons/tb";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import PrimaryButton from "../components/Button";
+import { apiGet, apiPost } from "../utils/api";
 
 const COUNTRIES = [
   "대한민국",
@@ -22,16 +23,9 @@ const COUNTRIES = [
   "직접 입력",
 ];
 
-// TODO: 로그인한 사용자의 등록 제품 API 응답으로 교체합니다.
-const REGISTERED_PRODUCTS = [
-  { id: "MCM-000001", name: "Aren Shopper" },
-  { id: "MCM-000002", name: "Stark Backpack" },
-  { id: "MCM-000003", name: "Liz Shopper" },
-];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 11 }, (_, index) => CURRENT_YEAR - 9 + index);
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
-const JOURNEYS_STORAGE_KEY = "onepick-journeys";
 
 const Page = styled.main`
   width: min(100%, 480px);
@@ -235,38 +229,39 @@ const PhotoLabel = styled.span`
   font: 300 14px/1 var(--font-kopub);
 `;
 
-const PhotoButton = styled.label`
-  display: flex;
-  height: 22px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border-radius: 30px;
-  padding: 0 11px;
-  background: var(--color-soft-taupe);
+const PhotoUrlRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+`;
+
+const PhotoUrlInput = styled.input`
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border: 1px solid var(--color-soft-taupe);
+  border-radius: 8px;
+  padding: 0 12px;
   color: #090a0a;
+  background: transparent;
+  font: 300 12px/1.3 var(--font-kopub);
+  outline: none;
+
+  &::placeholder { color: #a89b89; }
+  &:focus { border-color: var(--color-walnut); }
+`;
+
+const PhotoUrlButton = styled.button`
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--color-cream);
+  background: var(--color-walnut);
   font: 300 12px/1 var(--font-kopub);
   cursor: pointer;
 
-  svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  &:focus-within {
-    outline: 2px solid var(--color-walnut);
-    outline-offset: 3px;
-  }
-`;
-
-const HiddenFileInput = styled.input`
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
+  &:focus-visible { outline: 2px solid var(--color-walnut); outline-offset: 2px; }
 `;
 
 const PreviewList = styled.div`
@@ -285,6 +280,13 @@ const Preview = styled.img`
 
 const SubmitButton = styled(PrimaryButton)`
   margin-top: 15px;
+`;
+
+const SubmitError = styled.p`
+  margin: -8px 0 0;
+  color: #b42318;
+  font: 300 12px/1.45 var(--font-kopub);
+  text-align: center;
 `;
 
 const Dropdown = ({ ariaLabel, value, options, placeholder = "", onChange }) => {
@@ -353,15 +355,6 @@ const Dropdown = ({ ariaLabel, value, options, placeholder = "", onChange }) => 
   );
 };
 
-const readImage = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve({ name: file.name, src: reader.result });
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
-
 const JourneyTrip = () => {
   const navigate = useNavigate();
   const [year, setYear] = useState("");
@@ -371,7 +364,32 @@ const JourneyTrip = () => {
   const [customCountry, setCustomCountry] = useState("");
   const [city, setCity] = useState("");
   const [product, setProduct] = useState("");
+  const [registeredProducts, setRegisteredProducts] = useState([]);
   const [photos, setPhotos] = useState([]);
+  const [photoUrlInput, setPhotoUrlInput] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const loadProducts = async () => {
+      try {
+        const { data } = await apiGet("/products");
+        const list = Array.isArray(data?.products) ? data.products : [];
+        if (!active) return;
+        setRegisteredProducts(list.map((item) => ({
+          id: String(item.productId),
+          apiId: item.productId,
+          name: item.productName,
+        })));
+      } catch (productError) {
+        console.error("[Journey 오류] 등록 제품 조회에 실패했습니다.", productError);
+        if (active) setSubmitError(productError.message || "등록 제품을 불러오지 못했습니다.");
+      }
+    };
+    loadProducts();
+    return () => { active = false; };
+  }, []);
 
   const days = useMemo(() => {
     const count =
@@ -379,44 +397,80 @@ const JourneyTrip = () => {
     return Array.from({ length: count }, (_, index) => index + 1);
   }, [year, month]);
 
-  const handlePhotoChange = async (event) => {
-    const files = Array.from(event.target.files ?? []).filter((file) =>
-      file.type.startsWith("image/"),
-    );
-    const previews = await Promise.all(files.map(readImage));
-    setPhotos((current) => [...current, ...previews]);
-    event.target.value = "";
+  const handlePhotoUrlAdd = () => {
+    const url = photoUrlInput.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      setSubmitError("http:// 또는 https://로 시작하는 이미지 URL을 입력해주세요.");
+      return;
+    }
+    setPhotos((current) => [
+      ...current,
+      { name: `url-${current.length + 1}`, src: url },
+    ]);
+    setPhotoUrlInput("");
+    setSubmitError("");
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setSubmitError("");
+    console.info("[Journey 1/7] Charm 생성 요청을 시작합니다.");
 
-    const selectedProduct = REGISTERED_PRODUCTS.find(
+    const selectedProduct = registeredProducts.find(
       (item) => item.id === product,
     );
-    const journey = {
-      id: `journey-${Date.now()}`,
-      date: { year, month, day },
-      country: country === "직접 입력" ? customCountry.trim() : country,
-      city: city.trim(),
-      product: selectedProduct ?? null,
-      photos,
-    };
-
-    let savedJourneys = [];
-    try {
-      const parsedJourneys = JSON.parse(
-        localStorage.getItem(JOURNEYS_STORAGE_KEY) ?? "[]",
-      );
-      if (Array.isArray(parsedJourneys)) savedJourneys = parsedJourneys;
-    } catch {
-      savedJourneys = [];
+    const selectedCountry = country === "직접 입력" ? customCountry.trim() : country;
+    if (!year || !month || !day || !selectedCountry || !city.trim() || !selectedProduct || photos.length === 0) {
+      console.warn("[Journey 중단] 필수 입력값이 누락되었습니다.");
+      setSubmitError("날짜, 국가, 도시, 제품, 사진을 모두 입력해주세요.");
+      return;
     }
-    localStorage.setItem(
-      JOURNEYS_STORAGE_KEY,
-      JSON.stringify([...savedJourneys, journey]),
-    );
-    navigate("/journey/make");
+    console.info("[Journey 2/7] 입력값 검증이 완료되었습니다.", {
+      travelDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+      country: selectedCountry,
+      city: city.trim(),
+      productId: selectedProduct.apiId,
+      imageCount: photos.length,
+    });
+
+    const accessToken = localStorage.getItem("accessToken") ?? sessionStorage.getItem("accessToken");
+    if (!accessToken) {
+      console.warn("[Journey 중단] accessToken을 찾을 수 없습니다.");
+      setSubmitError("로그인 정보가 없습니다. 다시 로그인해주세요.");
+      return;
+    }
+    console.info("[Journey 3/7] JWT 인증 정보를 확인했습니다.");
+
+    setIsSubmitting(true);
+    try {
+      console.info("[Journey 4/7] POST /api/journeys 요청을 전송합니다.");
+      const journeyData = {
+        productId: selectedProduct.apiId,
+        country: selectedCountry,
+        city: city.trim(),
+        travelDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        imageUrls: photos.map((photo) => photo.src),
+      };
+      const { data, status } = await apiPost("/journeys", { ...journeyData, memo: "" });
+
+      console.info(`[Journey 5/7] 서버 응답을 받았습니다. HTTP ${status}`);
+
+      const candidates = Array.isArray(data.candidates)
+        ? data.candidates.filter((candidate) => candidate?.candidateId != null && candidate?.imageUrl)
+        : [];
+      if (candidates.length === 0) throw new Error("생성된 Charm 후보가 없습니다.");
+      console.info(`[Journey 6/7] AI Charm 후보 ${candidates.length}개를 확인했습니다.`, {
+        candidateIds: candidates.map((candidate) => candidate.candidateId),
+      });
+
+      console.info("[Journey 7/7] Charm 후보 선택 화면으로 이동합니다.");
+      navigate("/journey/make", { state: { candidates, journeyData } });
+    } catch (error) {
+      console.error("[Journey 오류] 여정 인증 또는 Charm 생성 요청에 실패했습니다.", error);
+      setSubmitError(error instanceof Error ? error.message : "여정 인증 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -497,7 +551,7 @@ const JourneyTrip = () => {
           <Dropdown
             ariaLabel="제품"
             value={product}
-            options={REGISTERED_PRODUCTS.map((item) => ({
+            options={registeredProducts.map((item) => ({
               value: item.id,
               label: item.name,
             }))}
@@ -508,12 +562,18 @@ const JourneyTrip = () => {
         <Field>
           <PhotoHeading>
             <PhotoLabel>PHOTO</PhotoLabel>
-            <PhotoButton>
-              PHOTO
-              <TbPlus aria-hidden="true" />
-              <HiddenFileInput type="file" accept="image/*" multiple onChange={handlePhotoChange} />
-            </PhotoButton>
           </PhotoHeading>
+          <PhotoUrlRow>
+            <PhotoUrlInput
+              type="url"
+              inputMode="url"
+              aria-label="여행 사진 이미지 URL"
+              placeholder="https://.../photo.jpg"
+              value={photoUrlInput}
+              onChange={(event) => setPhotoUrlInput(event.target.value)}
+            />
+            <PhotoUrlButton type="button" onClick={handlePhotoUrlAdd}>추가</PhotoUrlButton>
+          </PhotoUrlRow>
           <PreviewList $hasPhotos={photos.length > 0} aria-live="polite">
             {photos.map((photo, index) => (
               <Preview key={`${photo.name}-${index}`} src={photo.src} alt={`선택한 여행 사진 ${index + 1}`} />
@@ -521,9 +581,10 @@ const JourneyTrip = () => {
           </PreviewList>
         </Field>
 
-        <SubmitButton type="submit" icon={<TbSparkles />}>
-          Charm 생성
+        <SubmitButton type="submit" icon={<TbSparkles />} disabled={isSubmitting}>
+          {isSubmitting ? "Charm 생성 중..." : "Charm 생성"}
         </SubmitButton>
+        {submitError && <SubmitError role="alert">{submitError}</SubmitError>}
       </Form>
     </Page>
   );

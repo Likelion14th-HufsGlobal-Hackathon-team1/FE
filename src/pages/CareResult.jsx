@@ -1,36 +1,24 @@
 import { useEffect, useState } from "react";
 import { TbArrowLeft, TbClipboardCheck, TbSearch } from "react-icons/tb";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import styled from "styled-components";
 
 import PrimaryButton from "../components/Button";
+import { apiGet } from "../utils/api";
 
 const GOOD_CONDITION_THRESHOLD = 70;
 
-// TODO: 백엔드 연동 후 분석 API 응답으로 교체합니다.
-const MOCK_ANALYSIS = {
-  overallCondition: 86,
+const getStatus = (score) => score <= 33 ? "좋음" : score <= 66 ? "주의" : "케어 필요";
+
+const toAnalysis = (report) => ({
+  overallCondition: report.totalScore ?? 0,
+  aiComment: report.aiComment ?? "",
   items: [
-    {
-      label: "표면 오염도",
-      status: "좋음",
-      score: 18,
-      description: "AI가 얼룩, 이염, 변색 등 가방 표면의 오염 상태를 분석해요.",
-    },
-    {
-      label: "소재 컨디션",
-      status: "주의",
-      score: 57,
-      description: "AI가 가죽의 건조함, 갈라짐, 광택 등 소재의 상태를 분석해요.",
-    },
-    {
-      label: "형태/부속품",
-      status: "케어 필요",
-      score: 84,
-      description: "AI가 형태 변형, 모서리 마모, 스트랩과 금속 부속의 상태를 분석해요.",
-    },
-  ],
-};
+    { label: "표면 긁힘", score: report.scratchScore ?? 0, description: "AI가 표면의 긁힘과 마모 상태를 분석해요." },
+    { label: "표면 오염도", score: report.stainScore ?? 0, description: "AI가 얼룩, 이염, 변색 등 표면의 오염 상태를 분석해요." },
+    { label: "소재 컨디션", score: report.wearScore ?? 0, description: "AI가 소재의 노후화와 전반적인 컨디션을 분석해요." },
+  ].map((item) => ({ ...item, status: getStatus(item.score) })),
+});
 
 const STATUS_COLORS = {
   좋음: "#18c954",
@@ -122,11 +110,6 @@ const Summary = styled.section`
   text-align: center;
 `;
 
-const Score = styled.strong`
-  display: block;
-  font: 500 17px/1.3 var(--font-kopub);
-`;
-
 const SummaryText = styled.p`
   margin: 3px 0 0;
   font: 300 14px/1.55 var(--font-kopub);
@@ -207,19 +190,47 @@ const StoreButton = styled(PrimaryButton)`
   margin-top: 35px;
 `;
 
+const ResultMessage = styled.p`
+  margin: auto 0;
+  color: ${({ $error }) => ($error ? "#b42318" : "var(--color-soft-taupe)")};
+  font: 300 14px/1.5 var(--font-kopub);
+  text-align: center;
+`;
+
 const CareResult = () => {
   const navigate = useNavigate();
   const { state } = useLocation();
-  const [photoUrl, setPhotoUrl] = useState("");
-  const analysis = MOCK_ANALYSIS;
-  const isGoodCondition = analysis.overallCondition >= GOOD_CONDITION_THRESHOLD;
+  const [searchParams] = useSearchParams();
+  const careId = searchParams.get("careId");
+  const [report, setReport] = useState(state?.analysis ?? null);
+  const [isLoading, setIsLoading] = useState(!state?.analysis && Boolean(careId));
+  const [error, setError] = useState("");
+  const photoUrl = state?.photoUrl ?? "";
 
   useEffect(() => {
-    if (!state?.photo) return undefined;
-    const objectUrl = URL.createObjectURL(state.photo);
-    setPhotoUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [state?.photo]);
+    if (report || !careId) return;
+    let active = true;
+    const loadReport = async () => {
+      try {
+        console.info(`[Care Result] GET /api/care/reports/${careId}`);
+        const { data } = await apiGet(`/care/reports/${careId}`);
+        if (active) setReport(data);
+      } catch (loadError) {
+        console.error("[Care 오류] 분석 결과 조회에 실패했습니다.", loadError);
+        if (active) setError(loadError.message || "분석 결과를 불러오지 못했습니다.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    loadReport();
+    return () => { active = false; };
+  }, [careId, report]);
+
+  if (isLoading) return <Page><ResultMessage>분석 결과를 불러오는 중...</ResultMessage></Page>;
+  if (error || !report) return <Page><ResultMessage $error>{error || "분석 결과가 없습니다."}</ResultMessage></Page>;
+
+  const analysis = toAnalysis(report);
+  const isGoodCondition = analysis.overallCondition >= GOOD_CONDITION_THRESHOLD;
 
   return (
     <Page>
@@ -243,8 +254,9 @@ const CareResult = () => {
       </PhotoFrame>
 
       <Summary>
-        <Score>전체 컨디션 {analysis.overallCondition}%</Score>
-        {isGoodCondition ? (
+        {analysis.aiComment ? (
+          <SummaryText>{analysis.aiComment}</SummaryText>
+        ) : isGoodCondition ? (
           <SummaryText>
             현재 좋은 컨디션을 유지하고 있어요.<br />
             MCM의 전문 케어와 함께<br />
