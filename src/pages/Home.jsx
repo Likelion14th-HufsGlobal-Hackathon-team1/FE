@@ -636,9 +636,10 @@ const Home = () => {
         if (!active) return;
         const reservationStores = readStoredJson(STORAGE_KEYS.reservationStores);
         const reservationDates = readStoredJson(STORAGE_KEYS.reservationDates);
-        setCareHistory(reports.map((report) => ({
-          id: report.careId,
-          date: reservation?.careId === report.careId
+      setCareHistory(reports.map((report) => ({
+        id: report.careId,
+        productId: report.product?.productId ?? null,
+        date: reservation?.careId === report.careId
             ? reservation.date.replace(/\s*\([^)]*\)$/, "")
             : reservationDates[String(report.careId)]
               ? new Date(`${reservationDates[String(report.careId)]}T00:00:00`).toLocaleDateString("ko-KR").replace(/\. /g, ".").replace(/\.$/, "")
@@ -817,6 +818,14 @@ const Home = () => {
     }
   };
 
+  const reminderReservationDate = activeNotification
+    ? [...careHistory].reverse().find(
+        (care) =>
+          String(care.productId) === String(activeNotification.productId)
+          && care.date !== "-",
+      )?.date ?? null
+    : null;
+
   return (
     <Page>
       <RegisterBar>
@@ -984,7 +993,12 @@ const Home = () => {
             <ReminderMessage id="care-reminder-description">
               제품 케어 예정일이 다가왔어요.
               <br />
-              {activeNotification?.targetDate && <>{activeNotification.targetDate} 전후로<br /></>}
+              {reminderReservationDate && (
+                <>
+                  예약일은 {reminderReservationDate}이에요.
+                  <br />
+                </>
+              )}
               오래도록 좋은 상태를 유지할 수 있도록
               <br />
               지금 컨디션을 확인해보세요.
