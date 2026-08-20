@@ -11,11 +11,13 @@ const Button = styled.button`
   border: 0;
   border-radius: 30px;
   padding: 11px 20px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--color-walnut);
   color: #fff;
   font: 300 18px/1 var(--font-kopub);
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
   cursor: pointer;
   transition:
     filter 160ms ease,
@@ -61,11 +63,17 @@ const IconSlot = styled.span`
   }
 `;
 
+const ButtonLabel = styled.span`
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+`;
+
 const PrimaryButton = ({ children, icon, type = "button", ...buttonProps }) => {
   return (
     <Button type={type} {...buttonProps}>
       {icon && <IconSlot aria-hidden="true">{icon}</IconSlot>}
-      <span>{children}</span>
+      <ButtonLabel>{children}</ButtonLabel>
     </Button>
   );
 };

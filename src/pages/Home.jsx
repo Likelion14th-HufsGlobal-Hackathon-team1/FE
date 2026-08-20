@@ -243,14 +243,15 @@ const Certificate = styled.span`
   font-size: clamp(12px, 3.7vw, 15px);
   line-height: 1;
   letter-spacing: 0.08em;
-  white-space: nowrap;
+  text-align: center;
+  white-space: normal;
 `;
 
 const ProductDetails = styled.span`
   display: grid;
-  grid-template-columns: max-content max-content;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
   column-gap: 12px;
-  width: max-content;
+  width: fit-content;
   max-width: 100%;
   padding: 9px 13px;
   border: 1px solid rgba(255, 255, 255, 0.28);
@@ -261,7 +262,9 @@ const ProductDetails = styled.span`
   text-align: left;
 
   & > span {
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 `;
 
@@ -299,7 +302,10 @@ const ToggleRow = styled.div`
   gap: 5px;
   padding-top: 2px;
   font: 300 12px/1 var(--font-kopub);
-  white-space: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  text-align: right;
+  white-space: normal;
 `;
 
 const Switch = styled.button`
@@ -357,7 +363,8 @@ const ColumnTitle = styled.strong`
 
 const CareValue = styled.span`
   display: block;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 `;
 
 const CharmSection = styled.section`
