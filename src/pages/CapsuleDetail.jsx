@@ -335,42 +335,31 @@ const CharmScrollArea = styled.div`
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding-right: 2px;
+  gap: 0;
+  padding: 8px 2px 16px 0;
 `;
 
 const CharmItem = styled.div`
   position: relative;
-  display: flex;
-  min-height: 500px;
-  flex: 0 0 500px;
-  flex-direction: column;
-  padding: 30px 0 24px;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-height: 132px;
+  padding: 18px 0;
 
   &:not(:last-child) {
     border-bottom: 1px solid rgba(182, 168, 146, 0.3);
   }
 `;
 
-const CharmTop = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 18px;
-`;
-
-const CharmImageButton = styled.button`
+const CharmImageContainer = styled.div`
   width: 88px;
   height: 88px;
   flex: 0 0 88px;
   border: 0;
   padding: 0;
   background: transparent;
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid var(--color-walnut);
-    outline-offset: 3px;
-  }
 `;
 
 const CharmImage = styled.img`
@@ -383,21 +372,9 @@ const CharmImage = styled.img`
 const CharmInfo = styled.div`
   display: flex;
   width: 100%;
+  min-width: 0;
   flex-direction: column;
   gap: 0;
-  flex: 1;
-`;
-
-const CharmJourneyCollage = styled(PhotoCollage)`
-  height: 285px;
-  margin: 62px 0 0;
-`;
-
-const EmptyJourneyPhotos = styled.p`
-  margin: 80px 0 0;
-  color: var(--color-soft-taupe);
-  font: 300 13px/1.5 var(--font-kopub);
-  text-align: center;
 `;
 
 const CharmRow = styled.div`
@@ -463,7 +440,7 @@ const CapsuleDetail = () => {
     sessionStorage.setItem("capsule_intro_shown", "true");
     return true;
   });
-  const [activeTab, setActiveTab] = useState("letter");
+  const [activeTab, setActiveTab] = useState("charm");
 
   useEffect(() => {
     if (!productId) {
@@ -594,46 +571,23 @@ const CapsuleDetail = () => {
             <CharmScrollArea>
               {charms.map((charm) => (
                 <CharmItem key={charm.charmId}>
-                  <CharmTop>
-                    <CharmImageButton
-                      type="button"
-                      onClick={() =>
-                        navigate("/charm-detail", { state: { charm } })
-                      }
-                      aria-label="참 상세 보기"
-                    >
-                      <CharmImage src={charm.aiImageUrl} alt="AI가 생성한 Charm" />
-                    </CharmImageButton>
-                    <CharmInfo>
-                      <CharmRow>
-                        <CharmLabel>DATE</CharmLabel>
-                        <CharmValue>{formatDate(charm.travelDate)}</CharmValue>
-                      </CharmRow>
-                      <CharmRow>
-                        <CharmLabel>COUNTRY</CharmLabel>
-                        <CharmValue>{charm.country || "-"}</CharmValue>
-                      </CharmRow>
-                      <CharmRow>
-                        <CharmLabel>CITY</CharmLabel>
-                        <CharmValue>{charm.city || "-"}</CharmValue>
-                      </CharmRow>
-                    </CharmInfo>
-                  </CharmTop>
-                  {Array.isArray(charm.images) && charm.images.some(Boolean) ? (
-                    <CharmJourneyCollage>
-                      {charm.images.filter(Boolean).slice(0, 2).map((image, index) => (
-                        <PolaroidFrame
-                          key={`${charm.charmId}-${image}`}
-                          $rotation={index % 2 === 0 ? -5 : 4}
-                        >
-                          <TapeDecor />
-                          <PolaroidImg src={image} alt={`Journey 사진 ${index + 1}`} />
-                        </PolaroidFrame>
-                      ))}
-                    </CharmJourneyCollage>
-                  ) : (
-                    <EmptyJourneyPhotos>등록된 Journey 사진이 없습니다.</EmptyJourneyPhotos>
-                  )}
+                  <CharmImageContainer>
+                    <CharmImage src={charm.aiImageUrl} alt="AI가 생성한 Charm" />
+                  </CharmImageContainer>
+                  <CharmInfo>
+                    <CharmRow>
+                      <CharmLabel>DATE</CharmLabel>
+                      <CharmValue>{formatDate(charm.travelDate)}</CharmValue>
+                    </CharmRow>
+                    <CharmRow>
+                      <CharmLabel>COUNTRY</CharmLabel>
+                      <CharmValue>{charm.country || "-"}</CharmValue>
+                    </CharmRow>
+                    <CharmRow>
+                      <CharmLabel>CITY</CharmLabel>
+                      <CharmValue>{charm.city || "-"}</CharmValue>
+                    </CharmRow>
+                  </CharmInfo>
                 </CharmItem>
               ))}
               {!loadError && charms.length === 0 && <LetterBody>생성된 Charm이 없습니다.</LetterBody>}
