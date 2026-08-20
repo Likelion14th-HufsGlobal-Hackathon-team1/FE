@@ -46,6 +46,7 @@ const HeaderBanner = styled.div`
     width: 200%;
     background: url(${headerBg}) repeat-x center;
     background-size: auto 100%;
+    opacity: 0.58;
     animation: ${scrollPattern} 20s linear infinite;
   }
 `;
